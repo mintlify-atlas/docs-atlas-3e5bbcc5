@@ -30,7 +30,7 @@ Basic Authentication sends credentials with every request. Always use HTTPS in p
 
 Basic Authentication requires sending your credentials in the `Authorization` header using Base64 encoding:
 
-```
+```http
 Authorization: Basic base64(username:password)
 ```
 
@@ -159,7 +159,7 @@ Store your Personal Access Tokens securely. Treat them like passwords - never co
 
 Include the token in the `Authorization` header as a Bearer token:
 
-```
+```http
 Authorization: Bearer your-personal-access-token
 ```
 
