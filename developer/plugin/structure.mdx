@@ -1,0 +1,397 @@
+---
+title: Plugin Project Structure
+description: Understand the recommended structure for Halo plugin projects
+---
+
+A well-organized plugin project makes development easier and ensures compatibility with Halo's plugin system.
+
+## Recommended Directory Structure
+
+```
+my-plugin/
+├── src/
+│   └── main/
+│       ├── java/
+│       │   └── com/
+│       │       └── example/
+│       │           └── myplugin/
+│       │               ├── MyPlugin.java
+│       │               ├── extension/
+│       │               │   └── MyExtension.java
+│       │               ├── endpoint/
+│       │               │   └── MyEndpoint.java
+│       │               ├── reconciler/
+│       │               │   └── MyReconciler.java
+│       │               ├── service/
+│       │               │   └── MyService.java
+│       │               └── config/
+│       │                   └── MyConfiguration.java
+│       └── resources/
+│           ├── plugin.yaml
+│           ├── extensions/
+│           │   ├── extension.yaml
+│           │   └── setting.yaml
+│           ├── config.yaml
+│           └── static/
+│               └── ...
+├── console/
+│   ├── src/
+│   │   ├── index.ts
+│   │   └── views/
+│   ├── package.json
+│   └── vite.config.ts
+├── pom.xml
+└── README.md
+```
+
+## Core Files
+
+### plugin.yaml
+
+The plugin descriptor is required and must be in `src/main/resources/`:
+
+```yaml
+apiVersion: plugin.halo.run/v1alpha1
+kind: Plugin
+metadata:
+  name: my-plugin
+spec:
+  version: 1.0.0
+  requires: ">=2.0.0"
+  author:
+    name: Your Name
+  logo: https://example.com/logo.png
+  homepage: https://github.com/yourusername/my-plugin
+  displayName: My Plugin
+  description: Plugin description
+  license:
+    - name: MIT
+  # Optional: other plugins this plugin depends on
+  pluginDependencies:
+    another-plugin: ">=1.0.0"
+  # Optional: reference to settings
+  settingName: my-plugin-settings
+  # Optional: reference to config map
+  configMapName: my-plugin-configmap
+```
+
+<Note>
+The `metadata.name` must match your plugin's directory name and be unique across all plugins.
+</Note>
+
+### Main Plugin Class
+
+The entry point for your plugin (`src/main/java/.../MyPlugin.java`):
+
+```java
+package com.example.myplugin;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import run.halo.app.plugin.BasePlugin;
+import run.halo.app.plugin.PluginContext;
+
+@Slf4j
+@Component
+public class MyPlugin extends BasePlugin {
+
+    public MyPlugin(PluginContext pluginContext) {
+        super(pluginContext);
+        log.info("Plugin {} version {} initialized", 
+            pluginContext.getName(), 
+            pluginContext.getVersion());
+    }
+}
+```
+
+## Java Source Organization
+
+### Extension Classes
+
+Custom resource definitions go in the `extension` package:
+
+```java
+package com.example.myplugin.extension;
+
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import run.halo.app.extension.AbstractExtension;
+import run.halo.app.extension.GVK;
+
+@Data
+@EqualsAndHashCode(callSuper = true)
+@GVK(
+    group = "myplugin.example.com",
+    version = "v1alpha1",
+    kind = "MyResource",
+    plural = "myresources",
+    singular = "myresource"
+)
+public class MyResource extends AbstractExtension {
+    
+    private MyResourceSpec spec;
+    private MyResourceStatus status;
+    
+    @Data
+    public static class MyResourceSpec {
+        private String title;
+        private String content;
+    }
+    
+    @Data
+    public static class MyResourceStatus {
+        private Boolean processed;
+    }
+}
+```
+
+### Reconcilers
+
+Controllers that react to Extension changes (`reconciler` package):
+
+```java
+package com.example.myplugin.reconciler;
+
+import org.springframework.stereotype.Component;
+import run.halo.app.extension.controller.*;
+
+@Component
+public class MyReconciler implements Reconciler<Reconciler.Request> {
+    
+    @Override
+    public Result reconcile(Request request) {
+        // Handle resource changes
+        return Result.doNotRetry();
+    }
+    
+    @Override
+    public Controller setupWith(ControllerBuilder builder) {
+        return builder
+            .extension(new MyResource())
+            .build();
+    }
+}
+```
+
+### Endpoints
+
+Custom API endpoints (`endpoint` package):
+
+```java
+package com.example.myplugin.endpoint;
+
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.server.*;
+import run.halo.app.core.extension.endpoint.CustomEndpoint;
+
+@Component
+public class MyEndpoint implements CustomEndpoint {
+    
+    @Override
+    public RouterFunction<ServerResponse> endpoint() {
+        return RouterFunctions.route()
+            .GET("/my-resources", this::listResources)
+            .build();
+    }
+    
+    private Mono<ServerResponse> listResources(ServerRequest request) {
+        // Implementation
+    }
+}
+```
+
+### Services
+
+Business logic goes in the `service` package:
+
+```java
+package com.example.myplugin.service;
+
+import org.springframework.stereotype.Service;
+import run.halo.app.extension.ReactiveExtensionClient;
+
+@Service
+public class MyService {
+    private final ReactiveExtensionClient client;
+    
+    public MyService(ReactiveExtensionClient client) {
+        this.client = client;
+    }
+    
+    public Mono<MyResource> getResource(String name) {
+        return client.fetch(MyResource.class, name);
+    }
+}
+```
+
+### Configuration
+
+Spring configuration classes (`config` package):
+
+```java
+package com.example.myplugin.config;
+
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+@EnableConfigurationProperties(MyPluginProperties.class)
+public class MyConfiguration {
+    // Bean definitions
+}
+```
+
+## Resources Directory
+
+### extensions/
+
+YAML files defining Extensions that should be auto-loaded:
+
+```yaml
+# extensions/setting.yaml
+apiVersion: v1alpha1
+kind: Setting
+metadata:
+  name: my-plugin-settings
+spec:
+  forms:
+    - group: basic
+      label: Basic Settings
+      formSchema:
+        - $formkit: text
+          name: apiKey
+          label: API Key
+```
+
+<Warning>
+All Extensions in the `extensions/` directory are automatically registered when the plugin starts.
+</Warning>
+
+### config.yaml (Optional)
+
+Default configuration for the plugin:
+
+```yaml
+# config.yaml
+apiUrl: https://api.example.com
+timeout: 30
+retryCount: 3
+```
+
+This can be overridden by placing a file at `${halo.work-dir}/plugins/configs/${plugin-id}.yaml`.
+
+### static/
+
+Static resources (images, CSS, JavaScript) that should be served by the plugin.
+
+## Console UI (Optional)
+
+If your plugin includes admin UI:
+
+### console/src/index.ts
+
+```typescript
+import { definePlugin } from "@halo-dev/console-shared";
+import MyView from "./views/MyView.vue";
+
+export default definePlugin({
+  name: "MyPlugin",
+  components: {},
+  routes: [
+    {
+      path: "/my-plugin",
+      name: "MyPlugin",
+      component: MyView,
+    },
+  ],
+});
+```
+
+### console/package.json
+
+```json
+{
+  "name": "@example/my-plugin-console",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@halo-dev/console-shared": "^2.0.0",
+    "vue": "^3.3.0"
+  }
+}
+```
+
+## Build Configuration
+
+### Maven (pom.xml)
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    
+    <parent>
+        <groupId>run.halo.plugin</groupId>
+        <artifactId>parent</artifactId>
+        <version>2.0.0</version>
+    </parent>
+    
+    <groupId>com.example</groupId>
+    <artifactId>my-plugin</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+    
+    <dependencies>
+        <dependency>
+            <groupId>run.halo.app</groupId>
+            <artifactId>api</artifactId>
+        </dependency>
+    </dependencies>
+    
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>io.github.halo-dev</groupId>
+                <artifactId>halo-plugin-build-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+## Package Naming Conventions
+
+<Tip>
+Follow these conventions for better organization:
+
+- `extension.*` - Custom resource definitions
+- `reconciler.*` - Controllers and reconcilers
+- `endpoint.*` - REST API endpoints
+- `service.*` - Business logic
+- `config.*` - Configuration classes
+- `event.*` - Event listeners
+- `exception.*` - Custom exceptions
+</Tip>
+
+## Loading Resources
+
+The plugin system automatically:
+
+1. Reads `plugin.yaml` to register the plugin
+2. Scans for `@Component`, `@Service`, etc. in your Java code
+3. Loads all YAML files from `extensions/` directory
+4. Registers custom endpoints implementing `CustomEndpoint`
+5. Registers reconcilers implementing `Reconciler`
+
+## Next Steps
+
+- Learn about the [plugin lifecycle](/developer/plugin/lifecycle)
+- Create [custom extensions](/developer/plugin/api-extension)
+- Add [custom endpoints](/developer/plugin/custom-endpoints)
+- Configure your [plugin settings](/developer/plugin/configuration)

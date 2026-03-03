@@ -1,0 +1,514 @@
+---
+title: Adding Custom Endpoints
+description: Learn how to create custom REST API endpoints in Halo plugins
+---
+
+While Extensions automatically get REST endpoints, sometimes you need custom APIs for complex operations, aggregations, or business logic that doesn't fit the standard CRUD pattern.
+
+## CustomEndpoint Interface
+
+Custom endpoints implement the `CustomEndpoint` interface:
+
+```java
+package run.halo.app.core.extension.endpoint;
+
+import org.springframework.web.reactive.function.server.RouterFunction;
+import org.springframework.web.reactive.function.server.ServerResponse;
+import run.halo.app.extension.GroupVersion;
+
+/**
+ * RouterFunction provider for custom endpoints.
+ */
+public interface CustomEndpoint {
+    
+    RouterFunction<ServerResponse> endpoint();
+    
+    default GroupVersion groupVersion() {
+        return GroupVersion.parseAPIVersion("api.console.halo.run/v1alpha1");
+    }
+}
+```
+
+## URL Structure
+
+Custom endpoints are mounted under:
+
+```
+/apis/api.console.halo.run/v1alpha1/{your-path}
+```
+
+You can override the `groupVersion()` method to use a different prefix.
+
+## Creating a Custom Endpoint
+
+<Steps>
+
+### Create an endpoint class
+
+```java
+package com.example.myplugin.endpoint;
+
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.server.*;
+import reactor.core.publisher.Mono;
+import run.halo.app.core.extension.endpoint.CustomEndpoint;
+import run.halo.app.extension.ReactiveExtensionClient;
+
+@Component
+public class ArticleEndpoint implements CustomEndpoint {
+    
+    private final ReactiveExtensionClient client;
+    
+    public ArticleEndpoint(ReactiveExtensionClient client) {
+        this.client = client;
+    }
+    
+    @Override
+    public RouterFunction<ServerResponse> endpoint() {
+        return RouterFunctions.route()
+            .GET("/articles/stats", this::getStats)
+            .GET("/articles/search", this::search)
+            .POST("/articles/{name}/publish", this::publish)
+            .build();
+    }
+    
+    private Mono<ServerResponse> getStats(ServerRequest request) {
+        // Implementation
+        return ServerResponse.ok().bodyValue(Map.of("total", 100));
+    }
+    
+    private Mono<ServerResponse> search(ServerRequest request) {
+        String keyword = request.queryParam("keyword").orElse("");
+        // Implementation
+        return ServerResponse.ok().bodyValue(List.of());
+    }
+    
+    private Mono<ServerResponse> publish(ServerRequest request) {
+        String name = request.pathVariable("name");
+        // Implementation
+        return ServerResponse.ok().build();
+    }
+}
+```
+
+### Use SpringdocRouteBuilder for OpenAPI
+
+Document your endpoints with Swagger annotations:
+
+```java
+import org.springdoc.webflux.core.fn.SpringdocRouteBuilder;
+import static org.springdoc.core.fn.builders.apiresponse.Builder.responseBuilder;
+import static org.springdoc.core.fn.builders.parameter.Builder.parameterBuilder;
+
+@Component
+public class UserEndpoint implements CustomEndpoint {
+    
+    private final ExtensionClient client;
+    
+    public UserEndpoint(ExtensionClient client) {
+        this.client = client;
+    }
+    
+    @Override
+    public RouterFunction<ServerResponse> endpoint() {
+        return SpringdocRouteBuilder.route()
+            .GET("/users/-", this::me, builder -> builder
+                .operationId("GetCurrentUserDetail")
+                .description("Get current user detail")
+                .tag("api.console.halo.run/v1alpha1/User")
+                .response(responseBuilder()
+                    .implementation(User.class)
+                )
+            )
+            .GET("/users/{name}/profile", this::getProfile, builder -> builder
+                .operationId("GetUserProfile")
+                .description("Get user profile by name")
+                .tag("api.console.halo.run/v1alpha1/User")
+                .parameter(parameterBuilder()
+                    .name("name")
+                    .description("Username")
+                    .required(true)
+                )
+                .response(responseBuilder()
+                    .implementation(UserProfile.class)
+                )
+            )
+            .build();
+    }
+    
+    private Mono<ServerResponse> me(ServerRequest request) {
+        return ReactiveSecurityContextHolder.getContext()
+            .map(ctx -> {
+                var name = ctx.getAuthentication().getName();
+                return client.fetch(User.class, name)
+                    .orElseThrow(() -> new ExtensionNotFoundException(name));
+            })
+            .flatMap(user -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(user)
+            );
+    }
+    
+    private Mono<ServerResponse> getProfile(ServerRequest request) {
+        String name = request.pathVariable("name");
+        // Implementation
+        return ServerResponse.ok().build();
+    }
+}
+```
+
+</Steps>
+
+## Request Handling
+
+### Path Variables
+
+```java
+private Mono<ServerResponse> getArticle(ServerRequest request) {
+    String name = request.pathVariable("name");
+    
+    return client.fetch(Article.class, name)
+        .flatMap(article -> ServerResponse.ok().bodyValue(article))
+        .switchIfEmpty(ServerResponse.notFound().build());
+}
+```
+
+### Query Parameters
+
+```java
+private Mono<ServerResponse> searchArticles(ServerRequest request) {
+    String keyword = request.queryParam("keyword").orElse("");
+    int page = request.queryParam("page")
+        .map(Integer::parseInt)
+        .orElse(0);
+    int size = request.queryParam("size")
+        .map(Integer::parseInt)
+        .orElse(20);
+    
+    // Perform search
+    return ServerResponse.ok().bodyValue(results);
+}
+```
+
+### Request Body
+
+```java
+private Mono<ServerResponse> createArticle(ServerRequest request) {
+    return request.bodyToMono(ArticleRequest.class)
+        .flatMap(req -> {
+            var article = new Article();
+            // Map request to article
+            return client.create(article);
+        })
+        .flatMap(created -> ServerResponse
+            .status(HttpStatus.CREATED)
+            .bodyValue(created)
+        );
+}
+
+@Data
+public static class ArticleRequest {
+    private String title;
+    private String content;
+    private List<String> tags;
+}
+```
+
+### Headers
+
+```java
+private Mono<ServerResponse> getArticle(ServerRequest request) {
+    String authHeader = request.headers()
+        .firstHeader(HttpHeaders.AUTHORIZATION);
+    
+    Optional<String> acceptLanguage = 
+        request.headers().header("Accept-Language")
+        .stream().findFirst();
+    
+    // Process request
+}
+```
+
+## Response Building
+
+### Success Responses
+
+```java
+// 200 OK with JSON body
+return ServerResponse.ok()
+    .contentType(MediaType.APPLICATION_JSON)
+    .bodyValue(data);
+
+// 201 Created
+return ServerResponse
+    .status(HttpStatus.CREATED)
+    .bodyValue(createdResource);
+
+// 204 No Content
+return ServerResponse.noContent().build();
+```
+
+### Error Responses
+
+```java
+// 404 Not Found
+return ServerResponse.notFound().build();
+
+// 400 Bad Request
+return ServerResponse.badRequest()
+    .bodyValue(Map.of("error", "Invalid input"));
+
+// 401 Unauthorized
+return ServerResponse.status(HttpStatus.UNAUTHORIZED)
+    .bodyValue(Map.of("error", "Authentication required"));
+
+// 500 Internal Server Error
+return ServerResponse.status(HttpStatus.INTERNAL_SERVER_ERROR)
+    .bodyValue(Map.of("error", "Something went wrong"));
+```
+
+### Custom Headers
+
+```java
+return ServerResponse.ok()
+    .header("X-Total-Count", String.valueOf(totalCount))
+    .header("X-Page-Number", String.valueOf(pageNumber))
+    .bodyValue(pageData);
+```
+
+## Working with Extensions
+
+### Fetching Data
+
+```java
+@Component
+public class ArticleStatsEndpoint implements CustomEndpoint {
+    private final ReactiveExtensionClient client;
+    
+    public ArticleStatsEndpoint(ReactiveExtensionClient client) {
+        this.client = client;
+    }
+    
+    @Override
+    public RouterFunction<ServerResponse> endpoint() {
+        return RouterFunctions.route()
+            .GET("/articles/stats", this::getStats)
+            .build();
+    }
+    
+    private Mono<ServerResponse> getStats(ServerRequest request) {
+        return client.list(Article.class, null, null)
+            .collectList()
+            .map(articles -> {
+                long total = articles.size();
+                long published = articles.stream()
+                    .filter(a -> Boolean.TRUE.equals(
+                        a.getSpec().getPublished()
+                    ))
+                    .count();
+                
+                return Map.of(
+                    "total", total,
+                    "published", published,
+                    "draft", total - published
+                );
+            })
+            .flatMap(stats -> ServerResponse.ok().bodyValue(stats));
+    }
+}
+```
+
+### Complex Queries
+
+```java
+private Mono<ServerResponse> getRecentArticles(ServerRequest request) {
+    int limit = request.queryParam("limit")
+        .map(Integer::parseInt)
+        .orElse(10);
+    
+    return client.list(Article.class, 
+            article -> Boolean.TRUE.equals(
+                article.getSpec().getPublished()
+            ),
+            null
+        )
+        .sort(Comparator.comparing(
+            a -> a.getSpec().getPublishTime(),
+            Comparator.nullsLast(Comparator.reverseOrder())
+        ))
+        .take(limit)
+        .collectList()
+        .flatMap(articles -> ServerResponse.ok().bodyValue(articles));
+}
+```
+
+## Security
+
+### Checking Authentication
+
+```java
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+
+private Mono<ServerResponse> protectedEndpoint(ServerRequest request) {
+    return ReactiveSecurityContextHolder.getContext()
+        .map(ctx -> ctx.getAuthentication())
+        .filter(auth -> auth.isAuthenticated())
+        .flatMap(auth -> {
+            String username = auth.getName();
+            // Process authenticated request
+            return ServerResponse.ok().bodyValue(data);
+        })
+        .switchIfEmpty(
+            ServerResponse.status(HttpStatus.UNAUTHORIZED).build()
+        );
+}
+```
+
+### Checking Permissions
+
+```java
+private Mono<ServerResponse> adminOnlyEndpoint(ServerRequest request) {
+    return ReactiveSecurityContextHolder.getContext()
+        .map(ctx -> ctx.getAuthentication())
+        .filter(auth -> auth.getAuthorities().stream()
+            .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))
+        )
+        .flatMap(auth -> {
+            // Admin operation
+            return ServerResponse.ok().build();
+        })
+        .switchIfEmpty(
+            ServerResponse.status(HttpStatus.FORBIDDEN)
+                .bodyValue(Map.of("error", "Admin access required"))
+        );
+}
+```
+
+## Error Handling
+
+```java
+private Mono<ServerResponse> safeEndpoint(ServerRequest request) {
+    return processRequest(request)
+        .flatMap(result -> ServerResponse.ok().bodyValue(result))
+        .onErrorResume(IllegalArgumentException.class, e -> 
+            ServerResponse.badRequest()
+                .bodyValue(Map.of("error", e.getMessage()))
+        )
+        .onErrorResume(ExtensionNotFoundException.class, e ->
+            ServerResponse.notFound().build()
+        )
+        .onErrorResume(Exception.class, e -> {
+            log.error("Unexpected error", e);
+            return ServerResponse.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .bodyValue(Map.of("error", "Internal server error"));
+        });
+}
+```
+
+## File Uploads
+
+```java
+import org.springframework.http.codec.multipart.FilePart;
+
+private Mono<ServerResponse> uploadFile(ServerRequest request) {
+    return request.multipartData()
+        .flatMap(multipart -> {
+            FilePart filePart = (FilePart) multipart.getFirst("file");
+            if (filePart == null) {
+                return ServerResponse.badRequest()
+                    .bodyValue(Map.of("error", "No file provided"));
+            }
+            
+            Path destination = Path.of("/tmp/" + filePart.filename());
+            return filePart.transferTo(destination)
+                .then(ServerResponse.ok()
+                    .bodyValue(Map.of("filename", filePart.filename()))
+                );
+        });
+}
+```
+
+## Pagination Example
+
+```java
+@Data
+public static class PageResult<T> {
+    private List<T> items;
+    private long total;
+    private int page;
+    private int size;
+}
+
+private Mono<ServerResponse> listArticlesPaged(ServerRequest request) {
+    int page = request.queryParam("page")
+        .map(Integer::parseInt).orElse(0);
+    int size = request.queryParam("size")
+        .map(Integer::parseInt).orElse(20);
+    
+    return client.list(Article.class, null, null)
+        .collectList()
+        .map(allArticles -> {
+            int start = page * size;
+            int end = Math.min(start + size, allArticles.size());
+            
+            var pageResult = new PageResult<Article>();
+            pageResult.setItems(
+                allArticles.subList(start, end)
+            );
+            pageResult.setTotal(allArticles.size());
+            pageResult.setPage(page);
+            pageResult.setSize(size);
+            
+            return pageResult;
+        })
+        .flatMap(result -> ServerResponse.ok().bodyValue(result));
+}
+```
+
+## Testing Custom Endpoints
+
+Test your endpoints with WebTestClient:
+
+```java
+import org.springframework.test.web.reactive.server.WebTestClient;
+
+@SpringBootTest
+class ArticleEndpointTest {
+    
+    @Autowired
+    private WebTestClient webClient;
+    
+    @Test
+    void testGetStats() {
+        webClient.get()
+            .uri("/apis/api.console.halo.run/v1alpha1/articles/stats")
+            .exchange()
+            .expectStatus().isOk()
+            .expectBody()
+            .jsonPath("$.total").isNumber()
+            .jsonPath("$.published").isNumber();
+    }
+}
+```
+
+## Best Practices
+
+<Tip>
+- Use `SpringdocRouteBuilder` for OpenAPI documentation
+- Return appropriate HTTP status codes
+- Validate input before processing
+- Use reactive patterns (`Mono`/`Flux`) consistently
+- Handle errors gracefully with meaningful messages
+- Implement pagination for list endpoints
+- Add security checks for sensitive operations
+</Tip>
+
+<Warning>
+Custom endpoints bypass the automatic permission checks that apply to Extension CRUD operations. Always implement your own security checks.
+</Warning>
+
+## Next Steps
+
+- Configure [plugin settings](/developer/plugin/configuration)
+- Handle [plugin events](/developer/plugin/events)
+- Learn about [plugin lifecycle](/developer/plugin/lifecycle)

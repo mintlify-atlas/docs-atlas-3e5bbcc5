@@ -1,0 +1,433 @@
+---
+title: Environment setup
+description: Set up your local development environment for Halo CMS
+---
+
+This guide will walk you through setting up a complete development environment for Halo. You'll configure both the backend and frontend development servers.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed on your system:
+
+### Required software
+
+- **Java 21**: JDK 21 or later is required for building and running the backend
+- **Node.js**: Latest LTS version (for frontend development)
+- **pnpm 10**: Package manager for frontend dependencies
+- **Git**: Version control system
+- **Docker** (optional): For running databases and testing
+
+### Verify installations
+
+Check that you have the correct versions installed:
+
+<CodeGroup>
+
+```bash Java
+java -version
+# Should show Java 21 or later
+```
+
+```bash Node.js
+node --version
+# Should show v18 or later
+```
+
+```bash pnpm
+pnpm --version
+# Should show 10.x or later
+```
+
+```bash Git
+git --version
+```
+
+</CodeGroup>
+
+<Note>
+The project uses Gradle Wrapper, so you don't need to install Gradle separately. The wrapper will automatically download Gradle 9.3.0.
+</Note>
+
+## Clone the repository
+
+Clone the Halo repository with all submodules:
+
+<Steps>
+
+<Step title="Fork and clone the repository">
+
+First, fork the repository on GitHub, then clone your fork:
+
+```bash
+git clone https://github.com/{YOUR_USERNAME}/halo
+cd halo
+```
+
+</Step>
+
+<Step title="Initialize submodules">
+
+Halo uses Git submodules. Initialize and update them:
+
+```bash
+git submodule init
+git submodule update
+```
+
+</Step>
+
+<Step title="Add upstream remote">
+
+Add the original repository as an upstream remote:
+
+```bash
+git remote add upstream https://github.com/halo-dev/halo.git
+```
+
+</Step>
+
+</Steps>
+
+## Backend setup
+
+Set up the Spring Boot backend application.
+
+<Steps>
+
+<Step title="Verify Java version">
+
+The project requires Java 21. The build configuration enforces this:
+
+```gradle application/build.gradle
+tasks.withType(JavaCompile).configureEach {
+    options.release = 21
+    options.encoding = 'UTF-8'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+```
+
+Make sure your `JAVA_HOME` points to Java 21.
+
+</Step>
+
+<Step title="Build the project">
+
+Use the Gradle wrapper to build the entire project:
+
+```bash
+./gradlew clean build -x check
+```
+
+This command:
+- Cleans previous build artifacts
+- Builds all modules
+- Skips tests and checks for faster initial setup
+
+<Note>
+The first build may take several minutes as Gradle downloads dependencies.
+</Note>
+
+</Step>
+
+<Step title="Run the backend server">
+
+Start the development server:
+
+```bash
+./gradlew bootRun
+```
+
+The backend will start on `http://localhost:8090`.
+
+Alternatively, you can run with specific profiles:
+
+```bash
+./gradlew bootRun --args='--spring.profiles.active=dev'
+```
+
+</Step>
+
+</Steps>
+
+<Warning>
+The backend requires a database to run. By default, Halo uses an embedded H2 database for development. For production-like testing, configure PostgreSQL or MySQL.
+</Warning>
+
+## Frontend setup
+
+Set up the Vue.js console application.
+
+<Steps>
+
+<Step title="Install pnpm globally">
+
+If you haven't already, install pnpm globally:
+
+```bash
+npm install -g pnpm@10
+```
+
+</Step>
+
+<Step title="Navigate to the UI directory">
+
+```bash
+cd ui
+```
+
+</Step>
+
+<Step title="Install dependencies">
+
+Install all frontend dependencies:
+
+```bash
+pnpm install
+```
+
+This command installs dependencies for the main application and all packages in the workspace.
+
+</Step>
+
+<Step title="Build shared packages">
+
+Before running the dev server, build the shared packages:
+
+```bash
+pnpm build:packages
+```
+
+This builds internal packages like `@halo-dev/api-client`, `@halo-dev/components`, and others that the console depends on.
+
+</Step>
+
+<Step title="Start the development server">
+
+Run the frontend development server:
+
+```bash
+pnpm dev
+```
+
+This starts two development servers:
+- **Console**: `http://localhost:5173` (main admin interface)
+- **User Center**: `http://localhost:5174` (user-facing interface)
+
+You can also run them individually:
+
+<CodeGroup>
+
+```bash Console only
+pnpm dev:console
+```
+
+```bash User Center only
+pnpm dev:uc
+```
+
+</CodeGroup>
+
+</Step>
+
+</Steps>
+
+## Running both servers
+
+For full-stack development, you need both backend and frontend running:
+
+<Steps>
+
+<Step title="Terminal 1: Backend">
+
+In the root directory:
+
+```bash
+./gradlew bootRun
+```
+
+Wait until you see the Spring Boot startup message.
+
+</Step>
+
+<Step title="Terminal 2: Frontend">
+
+In the `ui` directory:
+
+```bash
+pnpm dev
+```
+
+</Step>
+
+<Step title="Access the application">
+
+Open your browser:
+
+- **Frontend console**: `http://localhost:5173`
+- **Backend API**: `http://localhost:8090`
+- **Console API docs**: `http://localhost:8090/swagger-ui.html`
+
+</Step>
+
+</Steps>
+
+<Note>
+The frontend development server proxies API requests to the backend server automatically through Vite's proxy configuration.
+</Note>
+
+## Development tips
+
+### Hot reload
+
+Both servers support hot reload:
+
+- **Backend**: Spring Boot DevTools enables automatic restart
+- **Frontend**: Vite provides instant hot module replacement (HMR)
+
+### Running tests
+
+<CodeGroup>
+
+```bash Backend tests
+./gradlew test
+```
+
+```bash Frontend tests
+cd ui
+pnpm test:unit
+```
+
+```bash E2E tests
+cd e2e
+./start.sh
+```
+
+</CodeGroup>
+
+### Code formatting
+
+Ensure your code is properly formatted before committing:
+
+<CodeGroup>
+
+```bash Backend formatting
+./gradlew checkstyleMain
+```
+
+```bash Frontend formatting
+cd ui
+pnpm format
+```
+
+```bash Check formatting
+cd ui
+pnpm format:check
+```
+
+</CodeGroup>
+
+### Type checking
+
+For TypeScript type checking in the frontend:
+
+```bash
+cd ui
+pnpm typecheck
+```
+
+### Generate API client
+
+After modifying backend APIs, regenerate the frontend API client:
+
+```bash
+cd ui
+pnpm api-client:gen
+```
+
+## Building for production
+
+When you're ready to create production builds:
+
+<Steps>
+
+<Step title="Build backend">
+
+```bash
+./gradlew build
+```
+
+This creates an executable JAR file in `application/build/libs/halo.jar`.
+
+</Step>
+
+<Step title="Build frontend">
+
+```bash
+cd ui
+pnpm build
+```
+
+This creates optimized production bundles in `ui/build/dist/`.
+
+</Step>
+
+</Steps>
+
+<Note>
+The full production build automatically includes the frontend assets in the backend JAR file through the `copyUiDist` Gradle task.
+</Note>
+
+## Troubleshooting
+
+### Gradle build fails
+
+If the Gradle build fails:
+
+1. Ensure Java 21 is installed and `JAVA_HOME` is set correctly
+2. Clear Gradle cache: `./gradlew clean --refresh-dependencies`
+3. Check for permission issues on `gradlew` file
+
+### Frontend dependencies fail
+
+If dependency installation fails:
+
+1. Clear pnpm cache: `pnpm store prune`
+2. Delete `node_modules` and `pnpm-lock.yaml`, then reinstall
+3. Ensure you're using pnpm 10.x
+
+### Port conflicts
+
+If ports 8090, 5173, or 5174 are already in use:
+
+- **Backend**: Add `--args='--server.port=8091'` to `bootRun`
+- **Frontend**: Vite will automatically use the next available port
+
+### Database connection issues
+
+For database-related errors:
+
+1. Check database configuration in `application/src/main/resources/application.yaml`
+2. Ensure the database service is running
+3. Verify connection credentials
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Extension system" icon="paintbrush" href="/developer/extension/overview">
+    Learn about Halo's extension framework
+  </Card>
+  <Card title="Plugin development" icon="folder-tree" href="/developer/plugin/basics">
+    Build your first Halo plugin
+  </Card>
+  <Card title="Theme development" icon="puzzle-piece" href="/developer/theme/basics">
+    Create a custom theme for Halo
+  </Card>
+  <Card title="API reference" icon="code-pull-request" href="/api/overview">
+    Explore the API documentation
+  </Card>
+</CardGroup>

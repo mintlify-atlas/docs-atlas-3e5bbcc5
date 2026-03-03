@@ -1,0 +1,511 @@
+---
+title: Search and Full-Text Indexing
+description: Learn how to implement and extend the search functionality in Halo CMS
+---
+
+Halo provides a powerful full-text search system built on Apache Lucene, with extensibility for other search engines like Elasticsearch, MeiliSearch, or Solr.
+
+## Architecture Overview
+
+The search system consists of three main components:
+
+1. **SearchEngine**: Handles indexing and searching documents
+2. **HaloDocument**: Represents searchable content
+3. **HaloDocumentsProvider**: Provides documents for indexing
+
+## Search Engine
+
+The `SearchEngine` interface defines the core search functionality.
+
+**Location:** `run.halo.app.search.SearchEngine` at api/src/main/java/run/halo/app/search/SearchEngine.java:1
+
+```java
+public interface SearchEngine extends ExtensionPoint {
+    
+    /**
+     * Whether the search engine is available.
+     */
+    boolean available();
+    
+    /**
+     * Add or update halo documents.
+     */
+    void addOrUpdate(Iterable<HaloDocument> haloDocuments);
+    
+    /**
+     * Delete halo documents by ids.
+     */
+    void deleteDocument(Iterable<String> haloDocIds);
+    
+    /**
+     * Delete all halo documents.
+     */
+    void deleteAll();
+    
+    /**
+     * Search halo documents.
+     */
+    SearchResult search(SearchOption option);
+}
+```
+
+### Default Implementation: Lucene
+
+Halo uses Apache Lucene as the default search engine with Chinese word segmentation support.
+
+**Reference Implementation:** `run.halo.app.search.LuceneSearchEngine`
+
+<Info>
+Lucene is embedded and requires no external dependencies, making it ideal for single-instance deployments. For multi-instance deployments, consider external search engines.
+</Info>
+
+## HaloDocument Structure
+
+The `HaloDocument` class represents searchable content.
+
+**Location:** `run.halo.app.search.HaloDocument` at api/src/main/java/run/halo/app/search/HaloDocument.java:1
+
+```java
+@Data
+public final class HaloDocument {
+    
+    // Unique document ID
+    @NotBlank
+    private String id;
+    
+    // Extension metadata name
+    @NotBlank
+    private String metadataName;
+    
+    // Custom metadata
+    private Map<String, String> annotations;
+    
+    // Document title
+    @NotBlank
+    private String title;
+    
+    // Document description
+    private String description;
+    
+    // Content without HTML tags
+    @NotBlank
+    private String content;
+    
+    // Category metadata names
+    private List<String> categories;
+    
+    // Tag metadata names
+    private List<String> tags;
+    
+    // Publication status
+    private boolean published;
+    
+    // Recycled status
+    private boolean recycled;
+    
+    // Public exposure status
+    private boolean exposed;
+    
+    // Owner metadata name
+    @NotBlank
+    private String ownerName;
+    
+    // Timestamps
+    @PastOrPresent
+    private Instant creationTimestamp;
+    
+    @PastOrPresent
+    private Instant updateTimestamp;
+    
+    // Document permalink
+    @NotBlank
+    private String permalink;
+    
+    // Document type (e.g., post.content.halo.run)
+    @NotBlank
+    private String type;
+}
+```
+
+**Example: Creating a HaloDocument**
+
+```java
+import run.halo.app.search.HaloDocument;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+public HaloDocument createDocument(Post post, PostSnapshot snapshot) {
+    var doc = new HaloDocument();
+    
+    doc.setId(post.getMetadata().getName());
+    doc.setMetadataName(post.getMetadata().getName());
+    doc.setTitle(post.getSpec().getTitle());
+    doc.setDescription(post.getSpec().getExcerpt());
+    doc.setContent(snapshot.getSpec().getContent()); // Strip HTML
+    
+    doc.setCategories(post.getSpec().getCategories());
+    doc.setTags(post.getSpec().getTags());
+    
+    doc.setPublished(post.getSpec().getPublish());
+    doc.setRecycled(post.getSpec().getDeleted());
+    doc.setExposed(!post.getSpec().getVisible().equals("PRIVATE"));
+    
+    doc.setOwnerName(post.getSpec().getOwner());
+    doc.setCreationTimestamp(post.getMetadata().getCreationTimestamp());
+    doc.setUpdateTimestamp(Instant.now());
+    doc.setPermalink(post.getStatus().getPermalink());
+    doc.setType("post.content.halo.run");
+    
+    doc.setAnnotations(Map.of(
+        "title", post.getSpec().getTitle(),
+        "slug", post.getSpec().getSlug()
+    ));
+    
+    return doc;
+}
+```
+
+## Document Management
+
+Starting from Halo 2.17, document management uses event-based mechanisms:
+
+### Adding Documents
+
+```java
+import run.halo.app.search.event.HaloDocumentAddRequestEvent;
+import org.springframework.context.ApplicationEventPublisher;
+
+@Component
+public class PostDocumentIndexer {
+    
+    private final ApplicationEventPublisher eventPublisher;
+    
+    public PostDocumentIndexer(ApplicationEventPublisher eventPublisher) {
+        this.eventPublisher = eventPublisher;
+    }
+    
+    public void indexPost(Post post) {
+        List<HaloDocument> documents = createDocuments(post);
+        eventPublisher.publishEvent(
+            new HaloDocumentAddRequestEvent(this, documents)
+        );
+    }
+    
+    private List<HaloDocument> createDocuments(Post post) {
+        // Create HaloDocument from post
+        return List.of(createDocument(post));
+    }
+}
+```
+
+### Deleting Documents
+
+```java
+import run.halo.app.search.event.HaloDocumentDeleteRequestEvent;
+
+@Component
+public class PostDocumentManager {
+    
+    private final ApplicationEventPublisher eventPublisher;
+    
+    public PostDocumentManager(ApplicationEventPublisher eventPublisher) {
+        this.eventPublisher = eventPublisher;
+    }
+    
+    public void deletePost(String postName) {
+        Set<String> docIds = Set.of(postName);
+        eventPublisher.publishEvent(
+            new HaloDocumentDeleteRequestEvent(this, docIds)
+        );
+    }
+}
+```
+
+### Rebuilding Index
+
+```java
+import run.halo.app.search.event.HaloDocumentRebuildRequestEvent;
+
+@Component
+public class IndexManager {
+    
+    private final ApplicationEventPublisher eventPublisher;
+    
+    public IndexManager(ApplicationEventPublisher eventPublisher) {
+        this.eventPublisher = eventPublisher;
+    }
+    
+    public void rebuildIndex() {
+        // Triggers rebuild for all document providers
+        eventPublisher.publishEvent(
+            new HaloDocumentRebuildRequestEvent(this)
+        );
+    }
+}
+```
+
+## HaloDocumentsProvider Extension
+
+Implement this interface to add custom document types to the search index.
+
+**Location:** Extension point documentation at docs/extension-points/search-engine.md:18
+
+**Reference Implementation:** `run.halo.app.search.post.PostHaloDocumentsProvider`
+
+```java
+import run.halo.app.search.HaloDocumentsProvider;
+import org.pf4j.ExtensionPoint;
+import reactor.core.publisher.Flux;
+
+public interface HaloDocumentsProvider extends ExtensionPoint {
+    
+    /**
+     * Fetch all documents for indexing.
+     * Called during index rebuild operations.
+     */
+    Flux<HaloDocument> fetchAll();
+    
+    /**
+     * Get the document type this provider handles.
+     */
+    default String getType() {
+        return "custom.type.halo.run";
+    }
+}
+```
+
+**Example: Custom Document Provider**
+
+```java
+import org.springframework.stereotype.Component;
+import run.halo.app.extension.ReactiveExtensionClient;
+import run.halo.app.search.HaloDocumentsProvider;
+
+@Component
+public class ProductDocumentProvider implements HaloDocumentsProvider {
+    
+    private final ReactiveExtensionClient client;
+    
+    public ProductDocumentProvider(ReactiveExtensionClient client) {
+        this.client = client;
+    }
+    
+    @Override
+    public Flux<HaloDocument> fetchAll() {
+        return client.list(Product.class, null, null)
+            .map(this::toHaloDocument);
+    }
+    
+    @Override
+    public String getType() {
+        return "product.shop.halo.run";
+    }
+    
+    private HaloDocument toHaloDocument(Product product) {
+        var doc = new HaloDocument();
+        doc.setId(product.getMetadata().getName());
+        doc.setMetadataName(product.getMetadata().getName());
+        doc.setTitle(product.getSpec().getName());
+        doc.setDescription(product.getSpec().getDescription());
+        doc.setContent(product.getSpec().getFullDescription());
+        doc.setType(getType());
+        doc.setPermalink("/products/" + product.getSpec().getSlug());
+        doc.setOwnerName(product.getSpec().getOwner());
+        doc.setPublished(product.getSpec().isPublished());
+        doc.setRecycled(false);
+        doc.setExposed(true);
+        doc.setCreationTimestamp(product.getMetadata().getCreationTimestamp());
+        doc.setUpdateTimestamp(Instant.now());
+        return doc;
+    }
+}
+```
+
+## Search API
+
+### Search Parameters
+
+Search requests use the following parameters:
+
+- `keyword`: Search query string
+- `sort`: Sort field and direction (e.g., `title.asc`, `publishTimestamp,desc`)
+- `offset`: Result offset for pagination
+- `limit`: Maximum number of results
+
+**Example Request:**
+
+```bash
+curl 'http://localhost:8090/apis/api.halo.run/v1alpha1/posts?keyword=halo&sort=title.asc&offset=0&limit=10'
+```
+
+### Search Response
+
+```yaml
+hits:
+  - name: halo01
+    title: Halo 01
+    permalink: /posts/halo01
+    categories: [technology, cms]
+    tags: [halo, opensource]
+  - name: halo02
+    title: Halo 02 Guide
+    permalink: /posts/halo02
+    categories: [tutorial]
+    tags: [guide, beginner]
+query: "halo"
+total: 100
+limit: 10
+offset: 0
+processingTimeMills: 15
+```
+
+<Warning>
+Most search engines don't recommend traditional pagination for performance reasons. Consider using `limit` with a reasonable maximum instead of deep pagination.
+</Warning>
+
+## Chinese Text Analysis
+
+Lucene's default analyzer doesn't handle Chinese text well. Halo supports Chinese word segmentation libraries:
+
+- **jcseg**: [https://gitee.com/lionsoul/jcseg](https://gitee.com/lionsoul/jcseg)
+- **IK Analyzer**: [https://github.com/blueshen/ik-analyzer](https://github.com/blueshen/ik-analyzer)
+- **Jieba**: [https://github.com/huaban/jieba-analysis](https://github.com/huaban/jieba-analysis)
+
+<Info>
+Halo automatically configures Chinese analyzers for optimal Chinese language search results.
+</Info>
+
+## Extending with External Search Engines
+
+For production deployments with multiple instances, consider external search engines:
+
+### Implementing a Custom Search Engine
+
+```java
+import run.halo.app.search.SearchEngine;
+import org.pf4j.Extension;
+
+@Extension
+public class ElasticsearchEngine implements SearchEngine {
+    
+    private final RestHighLevelClient client;
+    
+    @Override
+    public boolean available() {
+        try {
+            return client.ping(RequestOptions.DEFAULT);
+        } catch (IOException e) {
+            return false;
+        }
+    }
+    
+    @Override
+    public void addOrUpdate(Iterable<HaloDocument> documents) {
+        BulkRequest bulkRequest = new BulkRequest();
+        
+        for (HaloDocument doc : documents) {
+            IndexRequest request = new IndexRequest("halo-documents")
+                .id(doc.getId())
+                .source(convertToMap(doc));
+            bulkRequest.add(request);
+        }
+        
+        try {
+            client.bulk(bulkRequest, RequestOptions.DEFAULT);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to index documents", e);
+        }
+    }
+    
+    @Override
+    public void deleteDocument(Iterable<String> docIds) {
+        BulkRequest bulkRequest = new BulkRequest();
+        
+        for (String id : docIds) {
+            DeleteRequest request = new DeleteRequest("halo-documents", id);
+            bulkRequest.add(request);
+        }
+        
+        try {
+            client.bulk(bulkRequest, RequestOptions.DEFAULT);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to delete documents", e);
+        }
+    }
+    
+    @Override
+    public void deleteAll() {
+        DeleteByQueryRequest request = new DeleteByQueryRequest("halo-documents")
+            .setQuery(QueryBuilders.matchAllQuery());
+        
+        try {
+            client.deleteByQuery(request, RequestOptions.DEFAULT);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to delete all documents", e);
+        }
+    }
+    
+    @Override
+    public SearchResult search(SearchOption option) {
+        SearchRequest searchRequest = new SearchRequest("halo-documents");
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
+        
+        // Build query
+        sourceBuilder.query(QueryBuilders.multiMatchQuery(
+            option.getKeyword(),
+            "title", "content", "description"
+        ));
+        
+        sourceBuilder.from(option.getOffset());
+        sourceBuilder.size(option.getLimit());
+        
+        searchRequest.source(sourceBuilder);
+        
+        try {
+            org.elasticsearch.action.search.SearchResponse response = 
+                client.search(searchRequest, RequestOptions.DEFAULT);
+            return convertToSearchResult(response, option);
+        } catch (IOException e) {
+            throw new RuntimeException("Search failed", e);
+        }
+    }
+    
+    private Map<String, Object> convertToMap(HaloDocument doc) {
+        // Convert HaloDocument to Map for Elasticsearch
+        return Map.of(
+            "title", doc.getTitle(),
+            "content", doc.getContent(),
+            "description", doc.getDescription(),
+            "type", doc.getType(),
+            "permalink", doc.getPermalink()
+        );
+    }
+    
+    private SearchResult convertToSearchResult(
+        org.elasticsearch.action.search.SearchResponse response,
+        SearchOption option) {
+        // Convert Elasticsearch response to Halo SearchResult
+        // Implementation details...
+        return new SearchResult();
+    }
+}
+```
+
+<Tip>
+Register your custom SearchEngine as a plugin extension. Halo will automatically detect and use it if available.
+</Tip>
+
+## Performance Considerations
+
+1. **Index Size**: Monitor index size and implement cleanup for deleted content
+2. **Batch Operations**: Use bulk operations for adding/updating multiple documents
+3. **Resource Limits**: Set reasonable limits on search results (recommended max: 1000)
+4. **Caching**: Cache frequently searched queries
+5. **Asynchronous Indexing**: Index updates asynchronously to avoid blocking requests
+
+## Related Resources
+
+- [Extension System](/developer/extension/overview)
+- [Event System](/developer/plugin/events)
+- [Plugin Development](/developer/plugin/basics)

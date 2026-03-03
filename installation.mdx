@@ -1,0 +1,476 @@
+---
+title: Installation Guide
+description: Comprehensive guide for installing and deploying Halo in production environments
+---
+
+# Installation Guide
+
+This guide covers detailed installation methods for deploying Halo in production environments. Choose the method that best fits your infrastructure and requirements.
+
+<Info>
+  For a quick test installation, see the [Quick Start guide](/quickstart).
+</Info>
+
+## Installation Methods
+
+<CardGroup cols={2}>
+  <Card title="Docker" icon="docker">
+    Recommended for most users - simple, portable, and consistent across platforms
+  </Card>
+  <Card title="Docker Compose" icon="layer-group">
+    Best for production - easier configuration and multi-container orchestration
+  </Card>
+  <Card title="1Panel" icon="server">
+    Recommended for production - includes reverse proxy, SSL, and backup automation
+  </Card>
+  <Card title="Manual Installation" icon="wrench">
+    Advanced users who need custom configurations
+  </Card>
+</CardGroup>
+
+## System Requirements
+
+Before installing Halo, ensure your system meets these requirements:
+
+### Minimum Requirements
+
+- **CPU**: 1 core
+- **RAM**: 512MB (1GB recommended)
+- **Storage**: 10GB free space
+- **Operating System**: Linux, macOS, or Windows
+- **Java**: JRE 21 or higher (for manual installation)
+
+### Software Requirements
+
+- Docker 20.10+ (for Docker/Docker Compose installation)
+- Docker Compose 2.0+ (for Docker Compose installation)
+
+<Warning>
+  Halo requires port 8090 by default. Ensure this port is available or configure a different port.
+</Warning>
+
+## Docker Installation
+
+The Docker installation method provides the simplest way to run Halo with all dependencies included.
+
+### Basic Docker Deployment
+
+<Steps>
+  <Step title="Pull the Halo image">
+    ```bash
+    docker pull halohub/halo:2.22
+    ```
+  </Step>
+
+  <Step title="Create data directory">
+    ```bash
+    mkdir -p ~/.halo2
+    ```
+
+    This directory will store all your Halo data including database files, uploads, and configuration.
+  </Step>
+
+  <Step title="Run Halo container">
+    ```bash
+    docker run -d \
+      --name halo \
+      -p 8090:8090 \
+      -v ~/.halo2:/root/.halo2 \
+      halohub/halo:2.22
+    ```
+
+    <Note>
+      Halo will use the embedded H2 database by default, which is suitable for small to medium sites.
+    </Note>
+  </Step>
+
+  <Step title="Access Halo">
+    Open your browser and navigate to `http://localhost:8090` to complete the setup wizard.
+  </Step>
+</Steps>
+
+### Docker with Environment Variables
+
+You can customize Halo's behavior using environment variables:
+
+```bash
+docker run -d \
+  --name halo \
+  -p 8090:8090 \
+  -v ~/.halo2:/root/.halo2 \
+  -e JVM_OPTS="-Xmx512m -Xms512m" \
+  -e TZ=America/New_York \
+  halohub/halo:2.22
+```
+
+**Common environment variables:**
+
+- `JVM_OPTS`: JVM options for memory configuration
+- `TZ`: Timezone (defaults to `Asia/Shanghai`)
+- `HALO_WORK_DIR`: Working directory (defaults to `/root/.halo2`)
+
+## Docker Compose Installation
+
+Docker Compose provides better configuration management and is recommended for production deployments.
+
+### Basic Docker Compose Setup
+
+<Steps>
+  <Step title="Create docker-compose.yml">
+    Create a new directory for your Halo installation and create a `docker-compose.yml` file:
+
+    ```yaml docker-compose.yml
+    version: '3.8'
+
+    services:
+      halo:
+        image: halohub/halo:2.22
+        container_name: halo
+        restart: always
+        ports:
+          - "8090:8090"
+        volumes:
+          - ./data:/root/.halo2
+        environment:
+          - TZ=America/New_York
+    ```
+  </Step>
+
+  <Step title="Start Halo">
+    ```bash
+    docker compose up -d
+    ```
+  </Step>
+
+  <Step title="View logs">
+    ```bash
+    docker compose logs -f halo
+    ```
+  </Step>
+</Steps>
+
+### Docker Compose with MySQL
+
+For production environments, we recommend using an external database like MySQL:
+
+<CodeGroup>
+
+```yaml docker-compose.yml
+version: '3.8'
+
+services:
+  halo:
+    image: halohub/halo:2.22
+    container_name: halo
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./data:/root/.halo2
+    environment:
+      - TZ=America/New_York
+    command:
+      - --spring.r2dbc.url=r2dbc:pool:mysql://mysql:3306/halo
+      - --spring.r2dbc.username=halo
+      - --spring.r2dbc.password=your_secure_password
+      - --spring.sql.init.platform=mysql
+
+  mysql:
+    image: mysql:8.1.0
+    container_name: halo-mysql
+    restart: always
+    command:
+      - --default-authentication-plugin=caching_sha2_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+      - --explicit_defaults_for_timestamp=true
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=your_root_password
+      - MYSQL_DATABASE=halo
+      - MYSQL_USER=halo
+      - MYSQL_PASSWORD=your_secure_password
+```
+
+```yaml PostgreSQL
+version: '3.8'
+
+services:
+  halo:
+    image: halohub/halo:2.22
+    container_name: halo
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./data:/root/.halo2
+    environment:
+      - TZ=America/New_York
+    command:
+      - --spring.r2dbc.url=r2dbc:pool:postgresql://postgres:5432/halo
+      - --spring.r2dbc.username=halo
+      - --spring.r2dbc.password=your_secure_password
+      - --spring.sql.init.platform=postgresql
+
+  postgres:
+    image: postgres:15
+    container_name: halo-postgres
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U halo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=halo
+      - POSTGRES_USER=halo
+      - POSTGRES_PASSWORD=your_secure_password
+```
+
+</CodeGroup>
+
+<Warning>
+  Replace `your_secure_password` and `your_root_password` with strong, unique passwords.
+</Warning>
+
+**To deploy:**
+
+```bash
+docker compose up -d
+```
+
+### Database Configuration Options
+
+Halo supports multiple databases. Configure the connection using command-line arguments:
+
+| Database | Connection String Format |
+|----------|-------------------------|
+| H2 (default) | `r2dbc:h2:file:///${halo.work-dir}/db/halo-next?MODE=MySQL&DB_CLOSE_ON_EXIT=FALSE` |
+| MySQL | `r2dbc:pool:mysql://host:3306/database` |
+| MariaDB | `r2dbc:pool:mariadb://host:3306/database` |
+| PostgreSQL | `r2dbc:pool:postgresql://host:5432/database` |
+
+## 1Panel Installation (Recommended for Production)
+
+1Panel is an open-source Linux server management panel that makes Halo deployment much easier. It provides:
+
+- One-click Halo installation
+- Automatic reverse proxy configuration with Nginx
+- SSL certificate management (Let's Encrypt integration)
+- Automated backup scheduling
+- Easy upgrade management
+
+<Tip>
+  This is the recommended method for production deployments, especially if you're not familiar with server administration.
+</Tip>
+
+### Install 1Panel
+
+1. Install 1Panel on your Linux server by following the [1Panel installation guide](https://github.com/1Panel-dev/1Panel)
+2. Access the 1Panel web interface
+3. Navigate to the App Store
+4. Search for "Halo" and click Install
+5. Follow the installation wizard to configure:
+   - Domain name
+   - SSL certificate (automatic via Let's Encrypt)
+   - Database settings
+   - Backup schedule
+
+<Info>
+  For detailed instructions, refer to the [official 1Panel Halo deployment documentation](https://docs.halo.run/getting-started/install/1panel).
+</Info>
+
+## Configuration
+
+### Application Configuration
+
+Halo's configuration is stored in the working directory (`~/.halo2` by default). Key configuration files:
+
+- `application.yaml`: Main application configuration
+- `db/`: Database files (if using H2)
+- `themes/`: Installed themes
+- `plugins/`: Installed plugins
+- `upload/`: Uploaded media files
+
+### Port Configuration
+
+To change the default port (8090), you can:
+
+**Using environment variables:**
+
+```bash
+docker run -d \
+  --name halo \
+  -p 8080:8080 \
+  -v ~/.halo2:/root/.halo2 \
+  halohub/halo:2.22 \
+  --server.port=8080
+```
+
+**In docker-compose.yml:**
+
+```yaml
+services:
+  halo:
+    command:
+      - --server.port=8080
+    ports:
+      - "8080:8080"
+```
+
+### Memory Configuration
+
+For better performance, adjust JVM memory settings:
+
+```bash
+-e JVM_OPTS="-Xmx1g -Xms512m"
+```
+
+- `-Xmx`: Maximum heap size
+- `-Xms`: Initial heap size
+
+<Note>
+  Allocate memory based on your expected traffic and content volume. A typical small to medium site runs well with 512MB-1GB.
+</Note>
+
+## Post-Installation Steps
+
+<Steps>
+  <Step title="Complete setup wizard">
+    Navigate to your Halo URL and complete the initial setup wizard to create your admin account.
+  </Step>
+
+  <Step title="Configure site settings">
+    Access the admin console at `/console` and configure:
+    - Site title and description
+    - SEO settings
+    - Comment system
+    - Social media links
+  </Step>
+
+  <Step title="Install a theme">
+    Visit the theme marketplace in the admin console to browse and install a theme that matches your vision.
+  </Step>
+
+  <Step title="Set up backups">
+    Configure regular backups of your data directory:
+    - `/root/.halo2` (or your configured work directory)
+    - Database files (if using external database)
+
+    <Tip>
+      If using 1Panel, you can configure automated backups through the panel interface.
+    </Tip>
+  </Step>
+
+  <Step title="Configure reverse proxy (optional)">
+    For production, set up a reverse proxy like Nginx to:
+    - Enable HTTPS with SSL certificates
+    - Improve performance with caching
+    - Use a custom domain
+
+    1Panel handles this automatically, or you can configure Nginx manually.
+  </Step>
+</Steps>
+
+## Updating Halo
+
+### Docker Update
+
+```bash
+docker stop halo
+docker rm halo
+docker pull halohub/halo:latest
+docker run -d \
+  --name halo \
+  -p 8090:8090 \
+  -v ~/.halo2:/root/.halo2 \
+  halohub/halo:latest
+```
+
+### Docker Compose Update
+
+```bash
+docker compose down
+docker compose pull
+docker compose up -d
+```
+
+<Warning>
+  Always backup your data directory before updating Halo.
+</Warning>
+
+## Troubleshooting
+
+### Container won't start
+
+1. Check Docker logs:
+   ```bash
+   docker logs halo
+   ```
+
+2. Verify port availability:
+   ```bash
+   lsof -i :8090
+   ```
+
+3. Check disk space:
+   ```bash
+   df -h
+   ```
+
+### Database connection errors
+
+- Verify database container is healthy: `docker ps`
+- Check database credentials in your configuration
+- Ensure database service starts before Halo (use `depends_on` in compose)
+
+### Performance issues
+
+- Increase JVM memory allocation
+- Use an external database instead of H2
+- Enable caching in your reverse proxy
+- Monitor resource usage: `docker stats halo`
+
+## Getting Help
+
+If you encounter issues during installation:
+
+- Review the [official Halo documentation](https://docs.halo.run)
+- Check the [community forum](https://bbs.halo.run) for similar issues
+- Join the [Telegram channel](https://t.me/halo_dev) for community support
+- Report bugs on [GitHub](https://github.com/halo-dev/halo/issues)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Theme Customization" icon="palette">
+    Learn how to customize your site's appearance with themes
+  </Card>
+  <Card title="Plugin Development" icon="code">
+    Extend Halo's functionality by developing custom plugins
+  </Card>
+  <Card title="API Integration" icon="plug">
+    Integrate Halo with external services using the REST API
+  </Card>
+  <Card title="Performance Optimization" icon="gauge-high">
+    Optimize your Halo installation for better performance
+  </Card>
+</CardGroup>

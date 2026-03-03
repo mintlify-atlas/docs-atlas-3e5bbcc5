@@ -1,0 +1,362 @@
+---
+title: Theme File Structure
+description: Understanding the directory structure and organization of Halo themes
+---
+
+## Standard Theme Directory Layout
+
+A typical Halo theme follows this structure:
+
+```
+my-theme/
+├── theme.yaml              # Theme manifest (required)
+├── templates/              # Template files (required)
+│   ├── assets/            # Static resources
+│   │   ├── css/
+│   │   ├── js/
+│   │   └── images/
+│   ├── index.html         # Homepage template
+│   ├── post.html          # Single post template
+│   ├── page.html          # Single page template
+│   ├── category.html      # Category archive
+│   ├── categories.html    # Category list
+│   ├── tag.html           # Tag archive
+│   ├── tags.html          # Tag list
+│   ├── archives.html      # Post archives
+│   └── author.html        # Author archive
+├── i18n/                   # Internationalization (optional)
+│   ├── default.properties
+│   ├── en.properties
+│   └── zh.properties
+├── settings.yaml           # Theme settings schema (optional)
+└── README.md              # Documentation (optional)
+```
+
+## Required Files
+
+### theme.yaml
+
+The theme manifest is the only required file. It must be placed at the root of the theme directory.
+
+```yaml title="theme.yaml"
+apiVersion: theme.halo.run/v1alpha1
+kind: Theme
+metadata:
+  name: my-theme
+spec:
+  displayName: My Theme
+  author:
+    name: Your Name
+    website: https://example.com
+  description: A beautiful theme for Halo
+  logo: https://example.com/logo.png
+  website: https://github.com/your-username/my-theme
+  repo: https://github.com/your-username/my-theme.git
+  version: 1.0.0
+  require: ">=2.0.0"
+```
+
+<Info>
+  The `metadata.name` field must be unique across all installed themes and should match the theme directory name.
+</Info>
+
+### templates/ Directory
+
+This directory contains all Thymeleaf template files. At minimum, you should provide an `index.html` template for the homepage.
+
+## Theme Assets Location
+
+Static assets must be placed in the `templates/assets/` directory. This is enforced by Halo's asset resolution mechanism:
+
+```java title="application/src/main/java/run/halo/app/theme/config/ThemeWebFluxConfigurer.java"
+var assetsPath = themeRoot.resolve(themeName + "/templates/assets/" + resourcePaths);
+```
+
+### Asset Directory Structure
+
+Organize your assets logically:
+
+```
+templates/assets/
+├── css/
+│   ├── style.css
+│   └── responsive.css
+├── js/
+│   ├── main.js
+│   └── vendor/
+│       └── jquery.min.js
+├── images/
+│   ├── logo.png
+│   └── icons/
+└── fonts/
+    └── custom-font.woff2
+```
+
+## Template Files
+
+### Core Templates
+
+These templates correspond to the default template types defined by Halo:
+
+<AccordionGroup>
+  <Accordion title="index.html - Homepage">
+    The main landing page of your site. Typically displays recent posts and featured content.
+    
+    ```html
+    <!DOCTYPE html>
+    <html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <title th:text="${site.title}">Site Title</title>
+    </head>
+    <body>
+        <!-- Homepage content -->
+    </body>
+    </html>
+    ```
+  </Accordion>
+
+  <Accordion title="post.html - Single Post">
+    Template for displaying individual blog posts.
+    
+    Model variables:
+    - `post` - The post data (PostVo)
+    - `content` - The post content (ContentVo)
+  </Accordion>
+
+  <Accordion title="page.html - Single Page">
+    Template for standalone pages.
+    
+    Model variables:
+    - `page` - The page data (SinglePageVo)
+    - `content` - The page content (ContentVo)
+  </Accordion>
+
+  <Accordion title="category.html - Category Archive">
+    Displays posts in a specific category.
+    
+    Model variables:
+    - `category` - Category information (CategoryVo)
+    - `posts` - Posts in this category (ListResult of ListedPostVo)
+  </Accordion>
+
+  <Accordion title="archives.html - Post Archives">
+    Chronological archive of all posts.
+    
+    Model variables:
+    - `archives` - Archive data grouped by year/month (ListResult of PostArchiveVo)
+  </Accordion>
+</AccordionGroup>
+
+### Custom Templates
+
+You can define custom templates for posts, pages, and categories in your theme.yaml:
+
+```yaml title="theme.yaml"
+spec:
+  customTemplates:
+    post:
+      - name: Photo Gallery
+        description: Template for photo gallery posts
+        screenshot: /assets/screenshots/photo-gallery.png
+        file: post_photo_gallery.html
+    category:
+      - name: Magazine Layout
+        description: Magazine-style category layout
+        file: category_magazine.html
+    page:
+      - name: Landing Page
+        description: Marketing landing page
+        file: page_landing.html
+```
+
+<Note>
+  The `file` field should be relative to the `templates/` directory and must end with `.html`.
+</Note>
+
+## Internationalization Structure
+
+The `i18n/` directory contains resource bundles for multi-language support:
+
+```
+i18n/
+├── default.properties      # Fallback messages
+├── en.properties          # English
+├── zh.properties          # Chinese (Simplified)
+└── zh_TW.properties       # Chinese (Traditional)
+```
+
+### Property File Example
+
+```properties title="i18n/en.properties"
+title=My Site
+index.welcome=Welcome to my site
+post.readMore=Read More
+post.publishedOn=Published on
+comment.reply=Reply
+```
+
+### Using in Templates
+
+```html
+<h1 th:text="#{index.welcome}">Welcome</h1>
+<span th:text="#{post.publishedOn}">Published on</span>
+```
+
+## Settings Schema
+
+Define configurable options for your theme:
+
+```yaml title="settings.yaml"
+apiVersion: v1alpha1
+kind: Setting
+metadata:
+  name: theme-my-theme-setting
+spec:
+  forms:
+    - group: basic
+      label: Basic Settings
+      formSchema:
+        - $formkit: select
+          name: layout
+          label: Homepage Layout
+          value: grid
+          options:
+            - label: Grid
+              value: grid
+            - label: List
+              value: list
+        - $formkit: text
+          name: hero_title
+          label: Hero Title
+          value: Welcome to My Site
+```
+
+<Info>
+  If you include `settings.yaml`, reference it in your `theme.yaml` by setting `spec.settingName`.
+</Info>
+
+## Template Resolution
+
+Halo resolves templates using the `TemplateNameResolver` interface:
+
+```java title="api/src/main/java/run/halo/app/theme/TemplateNameResolver.java"
+public interface TemplateNameResolver {
+    /**
+     * Resolve template name if exists or default template name in classpath.
+     */
+    Mono<String> resolveTemplateNameOrDefault(ServerWebExchange exchange, String name);
+    
+    /**
+     * Determine whether the template file exists in the current theme.
+     */
+    Mono<Boolean> isTemplateAvailableInTheme(ServerWebExchange exchange, String name);
+}
+```
+
+This allows Halo to:
+1. Check if a template exists in the active theme
+2. Fall back to default templates if not found
+3. Support custom templates per content type
+
+## Best Practices
+
+<Steps>
+  <Step title="Use Consistent Naming">
+    Follow the default template naming convention for standard templates (`index.html`, `post.html`, etc.).
+  </Step>
+
+  <Step title="Organize Assets Logically">
+    Keep CSS, JavaScript, images, and fonts in separate subdirectories under `templates/assets/`.
+  </Step>
+
+  <Step title="Provide Template Partials">
+    Create reusable template fragments in a `partials/` or `fragments/` directory:
+    
+    ```
+    templates/
+    ├── partials/
+    │   ├── header.html
+    │   ├── footer.html
+    │   └── sidebar.html
+    ```
+  </Step>
+
+  <Step title="Include Screenshots">
+    Add screenshots for custom templates to help users choose the right layout.
+  </Step>
+
+  <Step title="Document Your Theme">
+    Include a comprehensive README.md with:
+    - Installation instructions
+    - Customization options
+    - Credits and licenses
+  </Step>
+</Steps>
+
+## Example: Complete Theme Structure
+
+Here's a complete example of a well-organized theme:
+
+```
+halo-theme-awesome/
+├── theme.yaml
+├── settings.yaml
+├── README.md
+├── LICENSE
+├── templates/
+│   ├── assets/
+│   │   ├── css/
+│   │   │   ├── style.css
+│   │   │   ├── dark-mode.css
+│   │   │   └── vendor/
+│   │   │       └── highlight.css
+│   │   ├── js/
+│   │   │   ├── main.js
+│   │   │   ├── search.js
+│   │   │   └── vendor/
+│   │   │       ├── jquery.min.js
+│   │   │       └── highlight.min.js
+│   │   ├── images/
+│   │   │   ├── logo.svg
+│   │   │   ├── default-avatar.png
+│   │   │   └── screenshots/
+│   │   │       ├── photo-gallery.png
+│   │   │       └── wide-layout.png
+│   │   └── fonts/
+│   │       └── custom-font.woff2
+│   ├── partials/
+│   │   ├── header.html
+│   │   ├── footer.html
+│   │   ├── sidebar.html
+│   │   └── post-card.html
+│   ├── index.html
+│   ├── post.html
+│   ├── post_photo_gallery.html
+│   ├── post_wide.html
+│   ├── page.html
+│   ├── category.html
+│   ├── categories.html
+│   ├── tag.html
+│   ├── tags.html
+│   ├── archives.html
+│   └── author.html
+└── i18n/
+    ├── default.properties
+    ├── en.properties
+    ├── zh.properties
+    ├── zh_TW.properties
+    ├── ja.properties
+    └── ko.properties
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Templates" icon="file-code" href="./templates">
+    Learn how to develop Thymeleaf templates
+  </Card>
+
+  <Card title="Configuration" icon="gear" href="./configuration">
+    Configure your theme with theme.yaml
+  </Card>
+</CardGroup>

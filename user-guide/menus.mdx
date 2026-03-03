@@ -1,0 +1,289 @@
+---
+title: Menu management
+description: Learn how to create and manage navigation menus in Halo CMS.
+---
+
+Menus provide navigation for your site, helping visitors discover your content. Halo allows you to create multiple menus and customize their structure and appearance.
+
+## Understanding menus in Halo
+
+Menus in Halo consist of:
+
+- **Menus**: Named collections of menu items (e.g., "Primary Navigation", "Footer Menu")
+- **Menu Items**: Individual links within a menu that can point to posts, pages, categories, tags, or custom URLs
+- **Hierarchical structure**: Menu items can have children, creating dropdown or nested navigation
+
+<Info>
+  Your theme determines how menus are displayed and where they appear. Some themes support multiple menu locations (header, footer, sidebar), while others may support only one primary menu.
+</Info>
+
+## Creating a menu
+
+<Steps>
+  <Step title="Navigate to menus">
+    From the admin dashboard, click on **Menus** in the sidebar to access menu management.
+  </Step>
+  
+  <Step title="Create new menu">
+    Click the **New Menu** button to create a new menu.
+  </Step>
+  
+  <Step title="Enter menu details">
+    Fill in the required information:
+    - **Name**: Internal identifier for the menu (e.g., "primary-menu")
+    - **Display Name**: Human-readable name shown in the admin panel (e.g., "Primary Navigation")
+  </Step>
+  
+  <Step title="Save the menu">
+    Click **Save** to create the empty menu. You can now add menu items to it.
+  </Step>
+</Steps>
+
+## Adding menu items
+
+Once you've created a menu, you can add items to it:
+
+<Steps>
+  <Step title="Open the menu">
+    Navigate to **Menus** and click on the menu you want to edit.
+  </Step>
+  
+  <Step title="Add new item">
+    Click the **Add Item** button to create a new menu item.
+  </Step>
+  
+  <Step title="Configure the menu item">
+    Fill in the menu item details:
+    - **Display Name**: The text shown in the menu (e.g., "Home", "About Us")
+    - **Link Type**: Choose how this item should link:
+      - **Custom URL**: Enter any URL manually
+      - **Target Reference**: Link to existing content (post, page, category, or tag)
+    - **URL/Target**: Depending on link type:
+      - For custom URLs: Enter the full URL (e.g., "https://example.com" or "/about")
+      - For target references: Select the content to link to
+    - **Target**: Choose how the link opens:
+      - `_self`: Open in the same window (default)
+      - `_blank`: Open in a new tab
+      - `_parent`: Open in the parent frame
+      - `_top`: Open in the full browser window
+    - **Priority**: Controls the display order (higher numbers appear first)
+  </Step>
+  
+  <Step title="Save the item">
+    Click **Save** to add the menu item to your menu.
+  </Step>
+</Steps>
+
+<Tip>
+  Use target references instead of custom URLs when linking to your own content. This ensures links remain valid even if you change the post or page slug.
+</Tip>
+
+## Creating nested menu items
+
+To create dropdown or nested navigation:
+
+<Steps>
+  <Step title="Create parent item">
+    Add a menu item that will serve as the parent (e.g., "Products").
+  </Step>
+  
+  <Step title="Create child item">
+    Add another menu item that will be the child (e.g., "Product 1").
+  </Step>
+  
+  <Step title="Set parent relationship">
+    Edit the child menu item and select the parent item from the **Parent Item** dropdown.
+  </Step>
+  
+  <Step title="Save changes">
+    Click **Save** to establish the parent-child relationship.
+  </Step>
+</Steps>
+
+<Note>
+  How nested menu items are displayed depends on your theme. Most themes show child items in dropdown menus when hovering over or clicking the parent item.
+</Note>
+
+## Reordering menu items
+
+To change the order in which menu items appear:
+
+<Steps>
+  <Step title="Open the menu">
+    Navigate to **Menus** and click on the menu you want to reorder.
+  </Step>
+  
+  <Step title="Adjust priorities">
+    Edit each menu item and change its **Priority** value. Items with higher priority values appear first.
+  </Step>
+  
+  <Step title="Drag and drop">
+    Alternatively, if your admin interface supports it, drag and drop menu items to reorder them visually.
+  </Step>
+  
+  <Step title="Save changes">
+    Ensure all changes are saved. The new order will be reflected on your site.
+  </Step>
+</Steps>
+
+## Editing menu items
+
+To modify an existing menu item:
+
+<Steps>
+  <Step title="Find the menu item">
+    Navigate to **Menus**, open the menu, and locate the item you want to edit.
+  </Step>
+  
+  <Step title="Open the editor">
+    Click on the menu item or the **Edit** button.
+  </Step>
+  
+  <Step title="Make changes">
+    Update the display name, URL, target, priority, or parent relationship.
+  </Step>
+  
+  <Step title="Save changes">
+    Click **Update** to apply your changes.
+  </Step>
+</Steps>
+
+## Deleting menu items
+
+To remove an item from a menu:
+
+<Steps>
+  <Step title="Locate the item">
+    Navigate to **Menus**, open the menu, and find the item you want to delete.
+  </Step>
+  
+  <Step title="Delete the item">
+    Click the **Delete** button next to the menu item.
+  </Step>
+  
+  <Step title="Confirm deletion">
+    Confirm the action when prompted. The item will be removed from the menu.
+  </Step>
+</Steps>
+
+<Warning>
+  If you delete a menu item that has children, the child items will become orphaned. You may need to reassign them to a new parent or delete them as well.
+</Warning>
+
+## Assigning menus to theme locations
+
+After creating and configuring your menu, you need to assign it to a location in your theme:
+
+<Steps>
+  <Step title="Navigate to theme settings">
+    Go to **Themes** in the sidebar and click on your active theme.
+  </Step>
+  
+  <Step title="Access menu settings">
+    Look for a **Menus** or **Navigation** section in your theme settings.
+  </Step>
+  
+  <Step title="Assign menu">
+    Select your menu from the dropdown for each available menu location (e.g., "Primary Menu", "Footer Menu").
+  </Step>
+  
+  <Step title="Save changes">
+    Click **Save** to apply the menu assignment. Your menu will now appear on your site.
+  </Step>
+</Steps>
+
+<Info>
+  Available menu locations are defined by your theme. Check your theme's documentation to understand what menu locations are supported and how they're displayed.
+</Info>
+
+## Menu item target references
+
+When creating menu items using target references, you can link to:
+
+- **Posts**: Link to a specific blog post
+- **Pages**: Link to a standalone page
+- **Categories**: Link to a category archive showing all posts in that category
+- **Tags**: Link to a tag archive showing all posts with that tag
+
+<Steps>
+  <Step title="Select reference type">
+    When adding or editing a menu item, choose **Target Reference** as the link type.
+  </Step>
+  
+  <Step title="Choose reference kind">
+    Select the type of content you want to link to (Post, Page, Category, or Tag).
+  </Step>
+  
+  <Step title="Select content">
+    Search for and select the specific post, page, category, or tag.
+  </Step>
+  
+  <Step title="Save">
+    Click **Save** to create the menu item with the target reference.
+  </Step>
+</Steps>
+
+<Tip>
+  Target references automatically stay up-to-date. If you change the permalink of a referenced post or page, the menu item will automatically point to the new URL.
+</Tip>
+
+## Using custom URLs
+
+For linking to external sites or custom pages:
+
+<Steps>
+  <Step title="Select custom URL">
+    When adding or editing a menu item, choose **Custom URL** as the link type.
+  </Step>
+  
+  <Step title="Enter URL">
+    Type the full URL, including the protocol:
+    - External: `https://example.com`
+    - Internal: `/custom-page`
+    - Anchor: `#section`
+  </Step>
+  
+  <Step title="Set target">
+    For external links, set the target to `_blank` to open in a new tab.
+  </Step>
+  
+  <Step title="Save">
+    Click **Save** to create the menu item.
+  </Step>
+</Steps>
+
+## Deleting a menu
+
+To remove an entire menu:
+
+<Steps>
+  <Step title="Unassign from theme">
+    First, go to your theme settings and unassign the menu from any theme locations.
+  </Step>
+  
+  <Step title="Navigate to menus">
+    Go to **Menus** in the admin dashboard.
+  </Step>
+  
+  <Step title="Delete the menu">
+    Click the **Delete** button next to the menu name.
+  </Step>
+  
+  <Step title="Confirm deletion">
+    Confirm the action. The menu and all its items will be permanently removed.
+  </Step>
+</Steps>
+
+<Warning>
+  Deleting a menu that's assigned to theme locations will cause those locations to be empty. Make sure to assign a different menu or update your theme settings first.
+</Warning>
+
+## Best practices for menus
+
+- **Keep menus simple**: Limit top-level items to 5-7 for better usability
+- **Use descriptive names**: Menu item labels should clearly indicate where they lead
+- **Group related items**: Use nested menus to organize related content
+- **Test on mobile**: Ensure your menus work well on small screens
+- **Use target references**: Link to internal content using references instead of URLs
+- **Consider user journey**: Organize menu items in the order users are likely to need them
+- **Update regularly**: Review and update menus when you add or remove important content

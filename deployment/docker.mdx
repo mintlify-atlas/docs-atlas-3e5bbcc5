@@ -1,0 +1,267 @@
+---
+title: "Docker deployment"
+description: "Deploy Halo CMS using Docker with H2, MySQL, or PostgreSQL databases"
+---
+
+## Quick start with Docker
+
+The fastest way to get Halo running is with Docker and the embedded H2 database.
+
+```bash
+docker run -d \
+  --name halo \
+  -p 8090:8090 \
+  -v ~/.halo2:/root/.halo2 \
+  halohub/halo:2.22
+```
+
+After the container starts, access Halo at `http://localhost:8090`.
+
+## Environment variables
+
+Halo supports the following environment variables for configuration:
+
+<ParamField path="HALO_WORK_DIR" type="string" default="/root/.halo2">
+  Working directory for Halo data, including database, logs, and uploads
+</ParamField>
+
+<ParamField path="SPRING_CONFIG_LOCATION" type="string" default="optional:classpath:/;optional:file:/root/.halo2/">
+  Additional Spring configuration file locations
+</ParamField>
+
+<ParamField path="JVM_OPTS" type="string" default="">
+  JVM options for memory and performance tuning (e.g., `-Xmx512m -Xms512m`)
+</ParamField>
+
+<ParamField path="TZ" type="string" default="Asia/Shanghai">
+  Timezone for the container
+</ParamField>
+
+## Production deployment
+
+<Warning>
+Do not use the embedded H2 database in production. Use PostgreSQL or MySQL for better performance and reliability.
+</Warning>
+
+### With PostgreSQL
+
+Create a `docker-compose.yml` file:
+
+```yaml docker-compose.yml
+version: '3.8'
+
+services:
+  halo:
+    image: halohub/halo:2.22
+    container_name: halo
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./halo:/root/.halo2
+    command:
+      - --spring.r2dbc.url=r2dbc:pool:postgresql://postgres:5432/halo
+      - --spring.r2dbc.username=halo
+      - --spring.r2dbc.password=your_secure_password
+      - --spring.sql.init.platform=postgresql
+      - --halo.external-url=https://yourdomain.com
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:15.4
+    container_name: halo-postgres
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "halo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      POSTGRES_PASSWORD: your_secure_password
+      POSTGRES_USER: halo
+      POSTGRES_DB: halo
+      PGUSER: halo
+    volumes:
+      - ./postgres:/var/lib/postgresql/data
+```
+
+### With MySQL
+
+Create a `docker-compose.yml` file:
+
+```yaml docker-compose.yml
+version: '3.8'
+
+services:
+  halo:
+    image: halohub/halo:2.22
+    container_name: halo
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./halo:/root/.halo2
+    command:
+      - --spring.r2dbc.url=r2dbc:pool:mysql://mysql:3306/halo
+      - --spring.r2dbc.username=halo
+      - --spring.r2dbc.password=your_secure_password
+      - --spring.sql.init.platform=mysql
+      - --halo.external-url=https://yourdomain.com
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.0
+    container_name: halo-mysql
+    restart: unless-stopped
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      MYSQL_ROOT_PASSWORD: your_secure_password
+      MYSQL_DATABASE: halo
+      MYSQL_USER: halo
+      MYSQL_PASSWORD: your_secure_password
+    volumes:
+      - ./mysql:/var/lib/mysql
+```
+
+## Start your deployment
+
+<Steps>
+  <Step title="Update configuration">
+    Replace `your_secure_password` and `https://yourdomain.com` with your actual values in the docker-compose.yml file.
+  </Step>
+  
+  <Step title="Start containers">
+    ```bash
+    docker-compose up -d
+    ```
+  </Step>
+  
+  <Step title="Check logs">
+    ```bash
+    docker-compose logs -f halo
+    ```
+    
+    Wait until you see "Started HaloApplication" in the logs.
+  </Step>
+  
+  <Step title="Access Halo">
+    Open your browser and navigate to `http://localhost:8090` (or your configured external URL).
+    
+    Complete the initial setup wizard to create your admin account.
+  </Step>
+</Steps>
+
+## Volume mounts
+
+Halo requires persistent storage for data and uploads:
+
+- **Application data**: Mount `/root/.halo2` to persist database, logs, and configuration
+- **Database data**: Mount database-specific directories (`/var/lib/postgresql/data` or `/var/lib/mysql`)
+
+<Info>
+The working directory contains:
+- `db/` - Database files (H2 only)
+- `logs/` - Application logs
+- `plugins/` - Installed plugins
+- `themes/` - Installed themes
+- `upload/` - User-uploaded files
+</Info>
+
+## JVM tuning
+
+For production environments, configure JVM options based on your server resources:
+
+```yaml docker-compose.yml
+services:
+  halo:
+    image: halohub/halo:2.22
+    environment:
+      - JVM_OPTS=-Xmx2g -Xms2g -XX:+UseG1GC
+```
+
+Recommended settings:
+- **Small sites** (< 1000 posts): `-Xmx512m -Xms512m`
+- **Medium sites** (1000-5000 posts): `-Xmx1g -Xms1g`
+- **Large sites** (> 5000 posts): `-Xmx2g -Xms2g`
+
+## Health checks
+
+Halo provides health check endpoints for monitoring:
+
+```bash
+# Readiness check
+curl http://localhost:8090/actuator/health/readiness
+
+# Liveness check
+curl http://localhost:8090/actuator/health/liveness
+```
+
+Add health checks to your Docker deployment:
+
+```yaml docker-compose.yml
+services:
+  halo:
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health/readiness"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+```
+
+## Upgrading
+
+<Steps>
+  <Step title="Backup your data">
+    Create a backup of your volumes before upgrading:
+    ```bash
+    docker-compose down
+    tar -czf halo-backup-$(date +%Y%m%d).tar.gz ./halo ./postgres
+    ```
+  </Step>
+  
+  <Step title="Update image version">
+    Edit your docker-compose.yml and change the image tag:
+    ```yaml
+    image: halohub/halo:2.23  # Update to new version
+    ```
+  </Step>
+  
+  <Step title="Pull and restart">
+    ```bash
+    docker-compose pull
+    docker-compose up -d
+    ```
+  </Step>
+  
+  <Step title="Verify upgrade">
+    Check logs for successful startup and database migration:
+    ```bash
+    docker-compose logs -f halo
+    ```
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Reverse proxy setup" icon="server" href="/deployment/reverse-proxy">
+    Configure Nginx or Caddy for SSL and domain routing
+  </Card>
+  
+  <Card title="Backup and restore" icon="floppy-disk" href="/deployment/backup-restore">
+    Set up automated backups for your Halo installation
+  </Card>
+</CardGroup>

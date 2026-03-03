@@ -1,122 +1,160 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Halo",
+  "theme": "maple",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#0e7490",
+    "light": "#06b6d4",
+    "dark": "#164e63"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/halo-dev/halo"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/halo-dev/halo"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
+              "introduction",
               "quickstart",
-              "development"
+              "installation"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/architecture",
+              "concepts/extensions",
+              "concepts/plugins",
+              "concepts/themes"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "User Guide",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "user-guide/posts",
+              "user-guide/pages",
+              "user-guide/categories-tags",
+              "user-guide/comments",
+              "user-guide/menus",
+              "user-guide/themes-management",
+              "user-guide/plugins-management",
+              "user-guide/users-roles",
+              "user-guide/attachments"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Deployment",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "deployment/docker",
+              "deployment/kubernetes",
+              "deployment/reverse-proxy",
+              "deployment/backup-restore"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Developer Guide",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Getting Started",
             "pages": [
-              "api-reference/introduction"
+              "developer/overview",
+              "developer/environment-setup"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Plugin Development",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "developer/plugin/basics",
+              "developer/plugin/structure",
+              "developer/plugin/lifecycle",
+              "developer/plugin/api-extension",
+              "developer/plugin/custom-endpoints",
+              "developer/plugin/configuration",
+              "developer/plugin/events"
+            ]
+          },
+          {
+            "group": "Theme Development",
+            "pages": [
+              "developer/theme/basics",
+              "developer/theme/structure",
+              "developer/theme/templates",
+              "developer/theme/assets",
+              "developer/theme/configuration"
+            ]
+          },
+          {
+            "group": "Extension System",
+            "pages": [
+              "developer/extension/overview",
+              "developer/extension/custom-models",
+              "developer/extension/indexing",
+              "developer/extension/reconciler"
+            ]
+          },
+          {
+            "group": "Advanced Topics",
+            "pages": [
+              "developer/advanced/authentication",
+              "developer/advanced/search",
+              "developer/advanced/notifications",
+              "developer/advanced/caching"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/overview",
+              "api/authentication"
+            ]
+          },
+          {
+            "group": "Public APIs",
+            "pages": [
+              "api/public/posts",
+              "api/public/pages",
+              "api/public/categories",
+              "api/public/tags",
+              "api/public/comments"
+            ]
+          },
+          {
+            "group": "Console APIs",
+            "pages": [
+              "api/console/content-management",
+              "api/console/user-management",
+              "api/console/plugin-management",
+              "api/console/theme-management"
+            ]
+          },
+          {
+            "group": "Extension APIs",
+            "pages": [
+              "api/extension/core-extensions",
+              "api/extension/custom-extensions"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

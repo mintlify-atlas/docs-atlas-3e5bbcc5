@@ -1,0 +1,461 @@
+---
+title: Plugin Configuration
+description: Learn how to configure plugins with external settings and properties
+---
+
+Halo provides multiple ways to configure plugins, from compile-time defaults to runtime settings managed through the admin interface.
+
+## Configuration Priority
+
+Configurations are loaded in the following order (highest to lowest priority):
+
+1. `${halo.work-dir}/plugins/configs/${plugin-id}.{yaml|yml}`
+2. `classpath:/config.{yaml|yml}`
+
+<Note>
+When both `.yaml` and `.yml` files exist, the `.yml` file is ignored.
+</Note>
+
+## Configuration Properties
+
+### Defining Properties
+
+Create a properties class using Spring Boot's configuration mechanism:
+
+```java
+package com.example.myplugin.config;
+
+import lombok.Data;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+
+@Data
+@ConfigurationProperties
+public class MyPluginProperties {
+    
+    private String encryptKey;
+    
+    private String certPath;
+    
+    private ApiConfig api = new ApiConfig();
+    
+    private Integer maxRetries = 3;
+    
+    @Data
+    public static class ApiConfig {
+        private String url;
+        private Integer timeout = 30;
+        private Boolean enableSsl = true;
+    }
+}
+```
+
+### Enabling Properties
+
+Enable the properties in a configuration class:
+
+```java
+package com.example.myplugin.config;
+
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+@EnableConfigurationProperties(MyPluginProperties.class)
+public class MyPluginConfiguration {
+    // Additional bean definitions if needed
+}
+```
+
+### Using Properties
+
+Inject the properties into your components:
+
+```java
+package com.example.myplugin;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import run.halo.app.plugin.BasePlugin;
+import run.halo.app.plugin.PluginContext;
+
+@Component
+@Slf4j
+public class MyPlugin extends BasePlugin {
+    
+    private final MyPluginProperties properties;
+    
+    public MyPlugin(
+        PluginContext pluginContext,
+        MyPluginProperties properties
+    ) {
+        super(pluginContext);
+        this.properties = properties;
+        
+        log.info("Encrypt key: {}", properties.getEncryptKey());
+        log.info("API URL: {}", properties.getApi().getUrl());
+    }
+}
+```
+
+## Default Configuration
+
+Provide default values in `src/main/resources/config.yaml`:
+
+```yaml
+# config.yaml
+encryptKey: default-key==
+certPath: /default/path/to/cert
+
+api:
+  url: https://api.example.com
+  timeout: 30
+  enableSsl: true
+
+maxRetries: 3
+```
+
+## External Configuration
+
+Users can override the defaults by creating a file at:
+
+```
+${halo.work-dir}/plugins/configs/${plugin-id}.yaml
+```
+
+For example, if your plugin's `metadata.name` is `my-plugin`:
+
+```yaml
+# ${halo.work-dir}/plugins/configs/my-plugin.yaml
+encryptKey: production-key==
+certPath: /production/path/to/cert
+
+api:
+  url: https://production-api.example.com
+  timeout: 60
+  enableSsl: true
+
+maxRetries: 5
+```
+
+## Settings via Admin UI
+
+For user-configurable settings through the admin interface, use the Settings system.
+
+### Define Setting Schema
+
+Create a Setting definition in `resources/extensions/setting.yaml`:
+
+```yaml
+apiVersion: v1alpha1
+kind: Setting
+metadata:
+  name: my-plugin-settings
+spec:
+  forms:
+    - group: basic
+      label: Basic Settings
+      formSchema:
+        - $formkit: text
+          name: apiKey
+          label: API Key
+          validation: required
+        - $formkit: url
+          name: webhookUrl
+          label: Webhook URL
+          help: URL to receive webhook notifications
+        
+    - group: advanced
+      label: Advanced Settings  
+      formSchema:
+        - $formkit: number
+          name: cacheSize
+          label: Cache Size (MB)
+          value: 100
+          validation: required|min:10|max:1000
+        - $formkit: select
+          name: logLevel
+          label: Log Level
+          value: INFO
+          options:
+            - label: DEBUG
+              value: DEBUG
+            - label: INFO
+              value: INFO
+            - label: WARN
+              value: WARN
+            - label: ERROR
+              value: ERROR
+```
+
+### Reference Setting in Plugin
+
+Reference the setting in your `plugin.yaml`:
+
+```yaml
+apiVersion: plugin.halo.run/v1alpha1
+kind: Plugin
+metadata:
+  name: my-plugin
+spec:
+  version: 1.0.0
+  # ...
+  settingName: my-plugin-settings
+```
+
+### Access Settings in Code
+
+Use `SettingFetcher` to access settings:
+
+```java
+import run.halo.app.plugin.SettingFetcher;
+import reactor.core.publisher.Mono;
+
+@Service
+public class MyService {
+    private final SettingFetcher settingFetcher;
+    
+    public MyService(SettingFetcher settingFetcher) {
+        this.settingFetcher = settingFetcher;
+    }
+    
+    public String getApiKey() {
+        return settingFetcher.fetch("basic", BasicSettings.class)
+            .map(BasicSettings::getApiKey)
+            .orElse(null);
+    }
+    
+    @Data
+    public static class BasicSettings {
+        private String apiKey;
+        private String webhookUrl;
+    }
+    
+    @Data
+    public static class AdvancedSettings {
+        private Integer cacheSize;
+        private String logLevel;
+    }
+}
+```
+
+### ReactiveSettingFetcher
+
+For reactive code, use `ReactiveSettingFetcher`:
+
+```java
+import run.halo.app.plugin.ReactiveSettingFetcher;
+import reactor.core.publisher.Mono;
+
+@Service
+public class ReactiveMyService {
+    private final ReactiveSettingFetcher settingFetcher;
+    
+    public ReactiveMyService(ReactiveSettingFetcher settingFetcher) {
+        this.settingFetcher = settingFetcher;
+    }
+    
+    public Mono<String> getApiKey() {
+        return settingFetcher.fetch("basic", BasicSettings.class)
+            .map(BasicSettings::getApiKey);
+    }
+    
+    public Mono<Map<String, JsonNode>> getAllSettings() {
+        return settingFetcher.getSettingValues();
+    }
+}
+```
+
+## ConfigMap
+
+Settings are stored in a ConfigMap referenced by the plugin.
+
+### Reference ConfigMap
+
+In your `plugin.yaml`:
+
+```yaml
+apiVersion: plugin.halo.run/v1alpha1
+kind: Plugin
+metadata:
+  name: my-plugin
+spec:
+  version: 1.0.0
+  # ...
+  configMapName: my-plugin-configmap
+```
+
+### Access ConfigMap Data
+
+```java
+import run.halo.app.extension.ConfigMap;
+import run.halo.app.extension.ReactiveExtensionClient;
+
+@Service
+public class ConfigService {
+    private final ReactiveExtensionClient client;
+    private final PluginContext context;
+    
+    public ConfigService(
+        ReactiveExtensionClient client,
+        PluginContext context
+    ) {
+        this.client = client;
+        this.context = context;
+    }
+    
+    public Mono<ConfigMap> getConfigMap() {
+        String configMapName = context.getConfigMapName();
+        return client.fetch(ConfigMap.class, configMapName);
+    }
+    
+    public Mono<String> getConfigValue(String key) {
+        return getConfigMap()
+            .map(cm -> cm.getData().get(key));
+    }
+}
+```
+
+## Reacting to Configuration Changes
+
+Listen for configuration updates:
+
+```java
+import org.springframework.context.event.EventListener;
+import run.halo.app.plugin.PluginConfigUpdatedEvent;
+import tools.jackson.databind.JsonNode;
+
+@Component
+public class ConfigChangeListener {
+    
+    @EventListener
+    public void onConfigUpdated(PluginConfigUpdatedEvent event) {
+        Map<String, JsonNode> oldSettings = event.getOldSettingValues();
+        Map<String, JsonNode> newSettings = event.getNewSettingValues();
+        
+        log.info("Configuration updated");
+        
+        // Check specific setting changes
+        JsonNode oldApiKey = oldSettings.get("apiKey");
+        JsonNode newApiKey = newSettings.get("apiKey");
+        
+        if (!Objects.equals(oldApiKey, newApiKey)) {
+            log.info("API key changed, reinitializing client...");
+            reinitializeClient(newApiKey.asText());
+        }
+    }
+    
+    private void reinitializeClient(String newApiKey) {
+        // Reinitialize API client with new credentials
+    }
+}
+```
+
+## Complete Example
+
+<Tabs>
+  <Tab title="Properties Class">
+    ```java
+    @Data
+    @ConfigurationProperties
+    public class NotificationPluginProperties {
+        private String smtpHost;
+        private Integer smtpPort = 587;
+        private String smtpUsername;
+        private String smtpPassword;
+        private Boolean enableTls = true;
+        private String fromAddress;
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Configuration Class">
+    ```java
+    @Configuration
+    @EnableConfigurationProperties(NotificationPluginProperties.class)
+    public class NotificationConfig {
+        
+        @Bean
+        public JavaMailSender mailSender(
+            NotificationPluginProperties props
+        ) {
+            JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
+            mailSender.setHost(props.getSmtpHost());
+            mailSender.setPort(props.getSmtpPort());
+            mailSender.setUsername(props.getSmtpUsername());
+            mailSender.setPassword(props.getSmtpPassword());
+            
+            Properties javaMailProps = mailSender.getJavaMailProperties();
+            javaMailProps.put("mail.smtp.auth", "true");
+            javaMailProps.put("mail.smtp.starttls.enable", 
+                props.getEnableTls().toString());
+            
+            return mailSender;
+        }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Default Config">
+    ```yaml
+    # src/main/resources/config.yaml
+    smtpHost: smtp.example.com
+    smtpPort: 587
+    smtpUsername: ""
+    smtpPassword: ""
+    enableTls: true
+    fromAddress: noreply@example.com
+    ```
+  </Tab>
+  
+  <Tab title="Setting Schema">
+    ```yaml
+    # extensions/setting.yaml
+    apiVersion: v1alpha1
+    kind: Setting
+    metadata:
+      name: notification-plugin-settings
+    spec:
+      forms:
+        - group: notification
+          label: Notification Settings
+          formSchema:
+            - $formkit: checkbox
+              name: enableEmailNotification
+              label: Enable Email Notifications
+              value: true
+            - $formkit: email
+              name: adminEmail
+              label: Admin Email
+              validation: required|email
+    ```
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<Tip>
+- Provide sensible defaults in `config.yaml`
+- Document all configuration options
+- Validate configuration values
+- Use typed properties classes instead of raw maps
+- Listen to `PluginConfigUpdatedEvent` to reload configuration
+- Don't store sensitive data in version control
+- Use Settings for user-facing configuration
+- Use ConfigurationProperties for developer/deployment configuration
+</Tip>
+
+<Warning>
+Sensitive values like API keys and passwords should be documented as required configuration, but never committed to source control with real values.
+</Warning>
+
+## Known Limitations
+
+- External configuration files increase complexity for clustered deployments
+- ConfigMap changes require write access to Halo's data directory
+- Settings are stored per-plugin, not per-installation
+
+## Next Steps
+
+- Learn about [plugin events](/developer/plugin/events)
+- Create [custom endpoints](/developer/plugin/custom-endpoints)
+- Understand the [plugin lifecycle](/developer/plugin/lifecycle)

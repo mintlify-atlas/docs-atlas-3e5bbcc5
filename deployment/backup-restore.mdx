@@ -1,0 +1,498 @@
+---
+title: "Backup and restore procedures"
+description: "Protect your Halo data with automated backups and recovery procedures"
+---
+
+## What to back up
+
+A complete Halo backup includes:
+
+- **Database**: All content, settings, and user data
+- **Work directory**: Uploaded files, plugins, themes, and logs
+- **Configuration files**: Custom application.yaml and environment settings
+
+<Warning>
+Regular backups are critical for disaster recovery. Test your restore procedure periodically to ensure backups are working correctly.
+</Warning>
+
+## Backup strategies
+
+<AccordionGroup>
+  <Accordion title="Full backup" icon="database">
+    Complete backup of all data, suitable for disaster recovery. Takes longer but provides complete restoration capability.
+  </Accordion>
+  
+  <Accordion title="Incremental backup" icon="clock">
+    Only backs up changed files since last backup. Faster but requires all previous backups for restoration.
+  </Accordion>
+  
+  <Accordion title="Database backup" icon="table">
+    Backs up only the database. Quick and essential for content recovery.
+  </Accordion>
+  
+  <Accordion title="File backup" icon="folder">
+    Backs up the work directory only. Important for uploaded media and customizations.
+  </Accordion>
+</AccordionGroup>
+
+## Docker deployment backups
+
+### Manual backup
+
+Create a one-time backup of your Docker deployment:
+
+<Steps>
+  <Step title="Stop Halo container">
+    ```bash
+    docker-compose down
+    ```
+    
+    <Info>
+    Stopping the container ensures data consistency in the backup.
+    </Info>
+  </Step>
+  
+  <Step title="Create backup archive">
+    ```bash
+    # Create backup directory
+    mkdir -p ~/halo-backups
+    
+    # Backup all data
+    tar -czf ~/halo-backups/halo-backup-$(date +%Y%m%d-%H%M%S).tar.gz \
+      ./halo \
+      ./postgres \
+      docker-compose.yml
+    ```
+  </Step>
+  
+  <Step title="Restart Halo">
+    ```bash
+    docker-compose up -d
+    ```
+  </Step>
+  
+  <Step title="Verify backup">
+    ```bash
+    ls -lh ~/halo-backups/
+    tar -tzf ~/halo-backups/halo-backup-*.tar.gz | head -20
+    ```
+  </Step>
+</Steps>
+
+### Automated backup script
+
+Create a backup script at `/usr/local/bin/halo-backup.sh`:
+
+```bash /usr/local/bin/halo-backup.sh
+#!/bin/bash
+
+# Configuration
+BACKUP_DIR="/backup/halo"
+HALO_DIR="/path/to/your/halo"
+RETENTION_DAYS=30
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+BACKUP_FILE="$BACKUP_DIR/halo-backup-$TIMESTAMP.tar.gz"
+
+# Create backup directory
+mkdir -p "$BACKUP_DIR"
+
+echo "Starting Halo backup at $(date)"
+
+# Stop Halo for consistent backup
+cd "$HALO_DIR"
+docker-compose down
+
+# Create backup
+tar -czf "$BACKUP_FILE" \
+  ./halo \
+  ./postgres \
+  docker-compose.yml
+
+if [ $? -eq 0 ]; then
+    echo "Backup created successfully: $BACKUP_FILE"
+    echo "Backup size: $(du -h $BACKUP_FILE | cut -f1)"
+else
+    echo "Backup failed!"
+    docker-compose up -d
+    exit 1
+fi
+
+# Restart Halo
+docker-compose up -d
+
+# Remove old backups
+find "$BACKUP_DIR" -name "halo-backup-*.tar.gz" -mtime +$RETENTION_DAYS -delete
+echo "Removed backups older than $RETENTION_DAYS days"
+
+echo "Backup completed at $(date)"
+```
+
+Make the script executable:
+
+```bash
+sudo chmod +x /usr/local/bin/halo-backup.sh
+```
+
+### Schedule automated backups
+
+Use cron to run backups daily at 2 AM:
+
+```bash
+# Edit crontab
+crontab -e
+
+# Add this line
+0 2 * * * /usr/local/bin/halo-backup.sh >> /var/log/halo-backup.log 2>&1
+```
+
+## Database-only backups
+
+For faster, more frequent backups, back up only the database:
+
+<CodeGroup>
+
+```bash PostgreSQL
+#!/bin/bash
+
+BACKUP_DIR="/backup/halo/db"
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+
+mkdir -p "$BACKUP_DIR"
+
+# Backup PostgreSQL database
+docker exec halo-postgres pg_dump -U halo halo | \
+  gzip > "$BACKUP_DIR/halo-db-$TIMESTAMP.sql.gz"
+
+echo "Database backup created: halo-db-$TIMESTAMP.sql.gz"
+
+# Keep only last 14 days
+find "$BACKUP_DIR" -name "halo-db-*.sql.gz" -mtime +14 -delete
+```
+
+```bash MySQL
+#!/bin/bash
+
+BACKUP_DIR="/backup/halo/db"
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+
+mkdir -p "$BACKUP_DIR"
+
+# Backup MySQL database
+docker exec halo-mysql mysqldump -u halo -p'your_password' halo | \
+  gzip > "$BACKUP_DIR/halo-db-$TIMESTAMP.sql.gz"
+
+echo "Database backup created: halo-db-$TIMESTAMP.sql.gz"
+
+# Keep only last 14 days
+find "$BACKUP_DIR" -name "halo-db-*.sql.gz" -mtime +14 -delete
+```
+
+</CodeGroup>
+
+Schedule hourly database backups:
+
+```bash
+0 * * * * /usr/local/bin/halo-db-backup.sh >> /var/log/halo-db-backup.log 2>&1
+```
+
+## Kubernetes deployment backups
+
+### Using Velero
+
+Velero is a popular backup solution for Kubernetes:
+
+<Steps>
+  <Step title="Install Velero">
+    ```bash
+    velero install \
+      --provider aws \
+      --plugins velero/velero-plugin-for-aws:v1.8.0 \
+      --bucket halo-backups \
+      --secret-file ./credentials-velero \
+      --backup-location-config region=us-west-2
+    ```
+  </Step>
+  
+  <Step title="Create backup schedule">
+    ```bash
+    velero schedule create halo-daily \
+      --schedule="0 2 * * *" \
+      --include-namespaces halo \
+      --ttl 720h0m0s
+    ```
+  </Step>
+  
+  <Step title="Manual backup">
+    ```bash
+    velero backup create halo-manual-$(date +%Y%m%d) \
+      --include-namespaces halo
+    ```
+  </Step>
+</Steps>
+
+### Manual Kubernetes backup
+
+```bash
+#!/bin/bash
+
+BACKUP_DIR="/backup/halo/k8s"
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+NAMESPACE="halo"
+
+mkdir -p "$BACKUP_DIR"
+
+echo "Starting Kubernetes backup for namespace: $NAMESPACE"
+
+# Export all resources
+kubectl get all,pvc,configmap,secret -n $NAMESPACE -o yaml > \
+  "$BACKUP_DIR/halo-k8s-$TIMESTAMP.yaml"
+
+# Backup persistent volumes
+for pvc in $(kubectl get pvc -n $NAMESPACE -o jsonpath='{.items[*].metadata.name}'); do
+    POD=$(kubectl get pods -n $NAMESPACE -o jsonpath="{.items[0].metadata.name}")
+    
+    kubectl exec -n $NAMESPACE $POD -- tar czf /tmp/pvc-backup.tar.gz /root/.halo2
+    kubectl cp $NAMESPACE/$POD:/tmp/pvc-backup.tar.gz \
+      "$BACKUP_DIR/halo-pvc-$pvc-$TIMESTAMP.tar.gz"
+    kubectl exec -n $NAMESPACE $POD -- rm /tmp/pvc-backup.tar.gz
+done
+
+# Backup database
+POSTGRES_POD=$(kubectl get pod -n $NAMESPACE -l app=postgres -o jsonpath="{.items[0].metadata.name}")
+kubectl exec -n $NAMESPACE $POSTGRES_POD -- pg_dump -U halo halo | \
+  gzip > "$BACKUP_DIR/halo-db-$TIMESTAMP.sql.gz"
+
+echo "Backup completed: $BACKUP_DIR"
+
+# Cleanup old backups
+find "$BACKUP_DIR" -name "halo-*" -mtime +30 -delete
+```
+
+## Restore procedures
+
+### Restore Docker deployment
+
+<Steps>
+  <Step title="Stop current deployment">
+    ```bash
+    docker-compose down
+    ```
+  </Step>
+  
+  <Step title="Remove existing data">
+    <Warning>
+    This will delete all current data. Make sure you have a backup of current state if needed.
+    </Warning>
+    
+    ```bash
+    rm -rf ./halo ./postgres
+    ```
+  </Step>
+  
+  <Step title="Extract backup">
+    ```bash
+    tar -xzf ~/halo-backups/halo-backup-YYYYMMDD-HHMMSS.tar.gz
+    ```
+  </Step>
+  
+  <Step title="Restore services">
+    ```bash
+    docker-compose up -d
+    ```
+  </Step>
+  
+  <Step title="Verify restoration">
+    ```bash
+    # Check containers are running
+    docker-compose ps
+    
+    # Check Halo logs
+    docker-compose logs -f halo
+    
+    # Access the site
+    curl http://localhost:8090
+    ```
+  </Step>
+</Steps>
+
+### Restore database only
+
+If you only need to restore the database:
+
+<CodeGroup>
+
+```bash PostgreSQL
+# Stop Halo
+docker-compose stop halo
+
+# Drop and recreate database
+docker exec -it halo-postgres psql -U halo -c "DROP DATABASE halo;"
+docker exec -it halo-postgres psql -U halo -c "CREATE DATABASE halo;"
+
+# Restore from backup
+gunzip -c /backup/halo/db/halo-db-YYYYMMDD-HHMMSS.sql.gz | \
+  docker exec -i halo-postgres psql -U halo halo
+
+# Restart Halo
+docker-compose start halo
+```
+
+```bash MySQL
+# Stop Halo
+docker-compose stop halo
+
+# Drop and recreate database
+docker exec -it halo-mysql mysql -u halo -p'your_password' \
+  -e "DROP DATABASE halo; CREATE DATABASE halo;"
+
+# Restore from backup
+gunzip -c /backup/halo/db/halo-db-YYYYMMDD-HHMMSS.sql.gz | \
+  docker exec -i halo-mysql mysql -u halo -p'your_password' halo
+
+# Restart Halo
+docker-compose start halo
+```
+
+</CodeGroup>
+
+### Restore Kubernetes deployment
+
+<Steps>
+  <Step title="Delete current deployment">
+    ```bash
+    kubectl delete namespace halo
+    ```
+  </Step>
+  
+  <Step title="Restore with Velero">
+    ```bash
+    # List available backups
+    velero backup get
+    
+    # Restore from backup
+    velero restore create --from-backup halo-daily-YYYYMMDD
+    
+    # Check restore status
+    velero restore describe halo-daily-YYYYMMDD
+    ```
+  </Step>
+  
+  <Step title="Verify restoration">
+    ```bash
+    kubectl get pods -n halo
+    kubectl logs -n halo -l app=halo -f
+    ```
+  </Step>
+</Steps>
+
+## Remote backup storage
+
+Store backups offsite for disaster recovery:
+
+<CodeGroup>
+
+```bash AWS S3
+#!/bin/bash
+
+# After creating backup, sync to S3
+aws s3 sync /backup/halo/ s3://my-halo-backups/
+
+# Or use AWS CLI in backup script
+aws s3 cp "$BACKUP_FILE" s3://my-halo-backups/$(basename $BACKUP_FILE)
+```
+
+```bash Backblaze B2
+#!/bin/bash
+
+# Install B2 CLI: pip install b2
+
+# Upload to B2
+b2 upload-file my-bucket "$BACKUP_FILE" "backups/$(basename $BACKUP_FILE)"
+```
+
+```bash rsync to remote server
+#!/bin/bash
+
+# Sync backups to remote server
+rsync -avz --delete /backup/halo/ user@backup-server:/backup/halo/
+```
+
+</CodeGroup>
+
+## Backup verification
+
+Regularly test your backups to ensure they work:
+
+```bash
+#!/bin/bash
+
+BACKUP_FILE="$1"
+TEST_DIR="/tmp/halo-backup-test"
+
+if [ -z "$BACKUP_FILE" ]; then
+    echo "Usage: $0 <backup-file>"
+    exit 1
+fi
+
+echo "Testing backup: $BACKUP_FILE"
+
+# Create test directory
+mkdir -p "$TEST_DIR"
+cd "$TEST_DIR"
+
+# Extract backup
+tar -xzf "$BACKUP_FILE"
+
+if [ $? -eq 0 ]; then
+    echo "✓ Backup extraction successful"
+    
+    # Verify files exist
+    if [ -d "halo" ] && [ -d "postgres" ] && [ -f "docker-compose.yml" ]; then
+        echo "✓ All required files present"
+    else
+        echo "✗ Missing required files"
+        exit 1
+    fi
+else
+    echo "✗ Backup extraction failed"
+    exit 1
+fi
+
+# Cleanup
+cd /
+rm -rf "$TEST_DIR"
+
+echo "✓ Backup verification completed successfully"
+```
+
+## Best practices
+
+<CardGroup cols={2}>
+  <Card title="3-2-1 rule" icon="shield">
+    Keep 3 copies of data, on 2 different media types, with 1 copy offsite
+  </Card>
+  
+  <Card title="Regular testing" icon="vial">
+    Test restore procedures quarterly to ensure backups work
+  </Card>
+  
+  <Card title="Monitor backups" icon="bell">
+    Set up alerts for backup failures
+  </Card>
+  
+  <Card title="Document procedures" icon="book">
+    Keep restore instructions accessible outside of the system being backed up
+  </Card>
+</CardGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Docker deployment" icon="docker" href="/deployment/docker">
+    Learn about Docker-based deployment options
+  </Card>
+  
+  <Card title="Kubernetes deployment" icon="dharmachakra" href="/deployment/kubernetes">
+    Deploy Halo on Kubernetes with persistent storage
+  </Card>
+</CardGroup>

@@ -1,0 +1,261 @@
+---
+title: Posts API
+description: Public API endpoints for managing and retrieving blog posts
+---
+
+The Posts API provides endpoints to list, retrieve, and navigate through blog posts in your Halo CMS.
+
+## List Posts
+
+Retrieves a paginated list of published posts.
+
+<CodeGroup>
+```bash cURL
+curl -X GET "http://localhost:8091/apis/api.content.halo.run/v1alpha1/posts?page=0&size=10" \
+  -H "Accept: application/json"
+```
+</CodeGroup>
+
+### Query Parameters
+
+<ParamField query="page" type="integer" default="0">
+  Page number. Default is 0.
+</ParamField>
+
+<ParamField query="size" type="integer" default="0">
+  Size number. Default is 0.
+</ParamField>
+
+<ParamField query="labelSelector" type="array">
+  Label selector. e.g.: `hidden!=true`
+</ParamField>
+
+<ParamField query="fieldSelector" type="array">
+  Field selector. e.g.: `metadata.name==halo`
+</ParamField>
+
+<ParamField query="sort" type="array">
+  Sorting criteria in the format: `property,(asc|desc)`. Default sort order is ascending. Multiple sort criteria are supported.
+</ParamField>
+
+### Response
+
+Returns a `ListedPostVoList` object containing paginated post results.
+
+<ResponseField name="items" type="array">
+  Array of post objects.
+  
+  <ResponseField name="metadata" type="Metadata" required>
+    Post metadata including name, labels, and timestamps.
+  </ResponseField>
+  
+  <ResponseField name="spec" type="PostSpec">
+    Post specification.
+    
+    <ResponseField name="title" type="string" required>
+      Post title.
+    </ResponseField>
+    
+    <ResponseField name="slug" type="string" required>
+      Post slug for URL.
+    </ResponseField>
+    
+    <ResponseField name="cover" type="string">
+      Cover image URL.
+    </ResponseField>
+    
+    <ResponseField name="allowComment" type="boolean" default="true">
+      Whether comments are allowed.
+    </ResponseField>
+    
+    <ResponseField name="pinned" type="boolean" default="false">
+      Whether the post is pinned.
+    </ResponseField>
+    
+    <ResponseField name="priority" type="integer" default="0">
+      Post priority for ordering.
+    </ResponseField>
+    
+    <ResponseField name="visible" type="string" default="PUBLIC">
+      Visibility setting: `PUBLIC`, `INTERNAL`, or `PRIVATE`.
+    </ResponseField>
+    
+    <ResponseField name="publishTime" type="string" format="date-time">
+      Publication timestamp.
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="status" type="PostStatus">
+    Post status information.
+    
+    <ResponseField name="permalink" type="string">
+      Permanent link to the post.
+    </ResponseField>
+    
+    <ResponseField name="excerpt" type="string">
+      Post excerpt.
+    </ResponseField>
+    
+    <ResponseField name="commentsCount" type="integer">
+      Number of comments.
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="stats" type="StatsVo">
+    Post statistics.
+    
+    <ResponseField name="visit" type="integer">
+      Number of visits.
+    </ResponseField>
+    
+    <ResponseField name="upvote" type="integer">
+      Number of upvotes.
+    </ResponseField>
+    
+    <ResponseField name="comment" type="integer">
+      Number of comments.
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="categories" type="array">
+    Array of category objects associated with the post.
+  </ResponseField>
+  
+  <ResponseField name="tags" type="array">
+    Array of tag objects associated with the post.
+  </ResponseField>
+  
+  <ResponseField name="owner" type="ContributorVo">
+    Post owner information.
+  </ResponseField>
+  
+  <ResponseField name="contributors" type="array">
+    Array of contributor objects.
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="page" type="integer">
+  Current page number, starts from 1.
+</ResponseField>
+
+<ResponseField name="size" type="integer">
+  Size of each page.
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of posts.
+</ResponseField>
+
+<ResponseField name="totalPages" type="integer">
+  Total number of pages.
+</ResponseField>
+
+<ResponseField name="first" type="boolean">
+  Whether this is the first page.
+</ResponseField>
+
+<ResponseField name="last" type="boolean">
+  Whether this is the last page.
+</ResponseField>
+
+<ResponseField name="hasNext" type="boolean">
+  Whether there is a next page.
+</ResponseField>
+
+<ResponseField name="hasPrevious" type="boolean">
+  Whether there is a previous page.
+</ResponseField>
+
+## Get Post by Name
+
+Retrieves a single post by its name.
+
+<CodeGroup>
+```bash cURL
+curl -X GET "http://localhost:8091/apis/api.content.halo.run/v1alpha1/posts/{name}" \
+  -H "Accept: application/json"
+```
+</CodeGroup>
+
+### Path Parameters
+
+<ParamField path="name" type="string" required>
+  Post name (unique identifier).
+</ParamField>
+
+### Response
+
+Returns a `PostVo` object with complete post details including content.
+
+<ResponseField name="metadata" type="Metadata" required>
+  Post metadata.
+</ResponseField>
+
+<ResponseField name="spec" type="PostSpec">
+  Post specification.
+</ResponseField>
+
+<ResponseField name="status" type="PostStatus">
+  Post status.
+</ResponseField>
+
+<ResponseField name="content" type="ContentVo">
+  Post content.
+  
+  <ResponseField name="raw" type="string">
+    Raw content (markdown/HTML).
+  </ResponseField>
+  
+  <ResponseField name="content" type="string">
+    Rendered content.
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="stats" type="StatsVo">
+  Post statistics.
+</ResponseField>
+
+<ResponseField name="categories" type="array">
+  Associated categories.
+</ResponseField>
+
+<ResponseField name="tags" type="array">
+  Associated tags.
+</ResponseField>
+
+<ResponseField name="owner" type="ContributorVo">
+  Post owner.
+</ResponseField>
+
+<ResponseField name="contributors" type="array">
+  Post contributors.
+</ResponseField>
+
+## Get Post Navigation
+
+Retrieves the previous and next posts for navigation.
+
+<CodeGroup>
+```bash cURL
+curl -X GET "http://localhost:8091/apis/api.content.halo.run/v1alpha1/posts/{name}/navigation" \
+  -H "Accept: application/json"
+```
+</CodeGroup>
+
+### Path Parameters
+
+<ParamField path="name" type="string" required>
+  Post name (unique identifier).
+</ParamField>
+
+### Response
+
+Returns a `NavigationPostVo` object.
+
+<ResponseField name="previous" type="ListedPostVo">
+  Previous post in the sequence.
+</ResponseField>
+
+<ResponseField name="next" type="ListedPostVo">
+  Next post in the sequence.
+</ResponseField>

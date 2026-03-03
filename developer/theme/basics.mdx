@@ -1,0 +1,197 @@
+---
+title: Theme Development Basics
+description: Learn the fundamentals of developing themes for Halo CMS
+---
+
+## Introduction
+
+Halo themes are built using Thymeleaf templates and follow a structured extension-based architecture. This guide covers the essential concepts you need to start developing themes for Halo.
+
+## What is a Halo Theme?
+
+A Halo theme is a collection of templates, assets, and configuration files that define the visual presentation and layout of your Halo site. Themes are implemented as Kubernetes-style custom resources that extend the Halo platform.
+
+### Key Concepts
+
+<AccordionGroup>
+  <Accordion title="Extension-Based Architecture">
+    Themes in Halo are defined as custom extensions using the GroupVersionKind (GVK) pattern:
+    
+    ```java
+    @GVK(group = "theme.halo.run", version = "v1alpha1", kind = "Theme",
+        plural = "themes", singular = "theme")
+    public class Theme extends AbstractExtension
+    ```
+    
+    This allows themes to be managed as first-class resources within Halo.
+  </Accordion>
+
+  <Accordion title="Thymeleaf Template Engine">
+    Halo uses Thymeleaf as its template engine, providing powerful server-side rendering capabilities with natural template syntax.
+  </Accordion>
+
+  <Accordion title="Finder APIs">
+    Themes access data through Finder APIs - specialized services annotated with `@Finder` that provide theme-safe data access methods.
+  </Accordion>
+</AccordionGroup>
+
+## Theme Lifecycle
+
+Themes go through several phases during their lifecycle:
+
+<Steps>
+  <Step title="Installation">
+    The theme is uploaded and extracted to the themes directory. Halo validates the theme manifest.
+  </Step>
+
+  <Step title="Configuration">
+    The theme's settings and configuration are loaded from `theme.yaml`. If the theme defines `settingName`, a corresponding Setting resource is created.
+  </Step>
+
+  <Step title="Activation">
+    When activated, the theme becomes the active theme for the site. Only one theme can be active at a time.
+  </Step>
+
+  <Step title="Rendering">
+    The theme's templates are used to render pages. Halo resolves templates and injects model data through Finder APIs.
+  </Step>
+</Steps>
+
+## Theme Status
+
+Themes have a status that indicates their current state:
+
+```java
+public static class ThemeStatus {
+    private ThemePhase phase;        // READY, FAILED, or UNKNOWN
+    private ConditionList conditions; // Detailed status conditions
+    private String location;          // Theme file location
+}
+```
+
+### Theme Phases
+
+- **READY**: The theme is successfully installed and ready to use
+- **FAILED**: The theme installation or validation failed
+- **UNKNOWN**: The theme status is not yet determined
+
+## Essential Components
+
+Every Halo theme consists of:
+
+<CardGroup cols={2}>
+  <Card title="theme.yaml" icon="file-code">
+    The manifest file that defines theme metadata, author information, and configuration
+  </Card>
+
+  <Card title="templates/" icon="folder">
+    Directory containing Thymeleaf templates for rendering different page types
+  </Card>
+
+  <Card title="templates/assets/" icon="images">
+    Static assets like CSS, JavaScript, images, and fonts
+  </Card>
+
+  <Card title="i18n/" icon="language">
+    Internationalization resource bundles for multi-language support
+  </Card>
+</CardGroup>
+
+## Default Template Types
+
+Halo defines standard template types that your theme should implement:
+
+```java title="api/src/main/java/run/halo/app/theme/DefaultTemplateEnum.java"
+public enum DefaultTemplateEnum {
+    INDEX("index"),           // Homepage
+    CATEGORIES("categories"), // Category list
+    CATEGORY("category"),     // Single category
+    ARCHIVES("archives"),     // Post archives
+    POST("post"),             // Single post
+    TAG("tag"),               // Tag archive
+    TAGS("tags"),             // Tag list
+    SINGLE_PAGE("page"),      // Single page
+    AUTHOR("author");         // Author archive
+}
+```
+
+<Info>
+  While these are the default templates, themes can define custom templates for posts, pages, and categories through the `customTemplates` configuration.
+</Info>
+
+## Accessing Data in Templates
+
+Themes access content through Finder APIs, which are Spring services marked with the `@Finder` annotation:
+
+```java title="api/src/main/java/run/halo/app/theme/finders/Finder.java"
+@Service
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface Finder {
+    /**
+     * The name of the theme model variable.
+     */
+    @AliasFor(annotation = Service.class)
+    String value() default "";
+}
+```
+
+### Available Finders
+
+- `postFinder` - Access posts and archives
+- `categoryFinder` - Access categories
+- `tagFinder` - Access tags
+- `singlePageFinder` - Access standalone pages
+- `commentFinder` - Access comments
+- `menuFinder` - Access navigation menus
+- `contributorFinder` - Access user information
+- `pluginFinder` - Access plugin information
+- `themeFinder` - Access theme information
+- `siteStatsFinder` - Access site statistics
+
+## Example: Simple Template
+
+Here's a basic example of a Halo theme template:
+
+```html title="templates/index.html"
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title th:text="${site.title}">Site Title</title>
+    <link rel="stylesheet" th:href="@{${#theme.assets('/css/style.css')}}" />
+</head>
+<body>
+    <h1 th:text="#{index.welcome}">Welcome</h1>
+    
+    <div th:each="post : ${posts.items}">
+        <h2 th:text="${post.spec.title}">Post Title</h2>
+        <div th:text="${post.excerpt.raw}">Excerpt</div>
+    </div>
+</body>
+</html>
+```
+
+<Note>
+  The `#theme.assets()` expression is a special Halo function that generates the correct URL for theme assets, handling theme preview mode automatically.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Theme Structure" icon="folder-tree" href="./structure">
+    Learn about the directory structure and file organization
+  </Card>
+
+  <Card title="Templates" icon="file-code" href="./templates">
+    Deep dive into Thymeleaf template development
+  </Card>
+
+  <Card title="Configuration" icon="gear" href="./configuration">
+    Configure your theme with theme.yaml
+  </Card>
+
+  <Card title="Assets" icon="image" href="./assets">
+    Manage CSS, JavaScript, and static resources
+  </Card>
+</CardGroup>

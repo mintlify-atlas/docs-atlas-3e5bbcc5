@@ -1,0 +1,550 @@
+---
+title: Managing Theme Assets
+description: Learn how to manage CSS, JavaScript, images, and other static resources in Halo themes
+---
+
+## Asset Directory Structure
+
+All static assets must be placed in the `templates/assets/` directory within your theme:
+
+```
+my-theme/
+└── templates/
+    └── assets/
+        ├── css/
+        │   ├── style.css
+        │   ├── dark-mode.css
+        │   └── vendor/
+        │       └── normalize.css
+        ├── js/
+        │   ├── main.js
+        │   ├── search.js
+        │   └── vendor/
+        │       └── jquery.min.js
+        ├── images/
+        │   ├── logo.svg
+        │   ├── default-avatar.png
+        │   └── icons/
+        └── fonts/
+            └── custom-font.woff2
+```
+
+<Warning>
+  Assets **must** be in `templates/assets/` - this is enforced by Halo's asset resolution system. Assets placed elsewhere will not be accessible.
+</Warning>
+
+## How Asset Resolution Works
+
+Halo uses a custom resource resolver to serve theme assets:
+
+```java title="application/src/main/java/run/halo/app/theme/config/ThemeWebFluxConfigurer.java"
+@Override
+public void addResourceHandlers(ResourceHandlerRegistry registry) {
+    registry.addResourceHandler("/themes/{themeName}/assets/{*resourcePaths}")
+        .setCacheControl(cacheControl)
+        .setUseLastModified(useLastModified)
+        .resourceChain(true)
+        .addResolver(new EncodedResourceResolver())
+        .addResolver(new ThemePathResourceResolver(themeRootGetter.get()));
+}
+```
+
+Assets are resolved to the actual file path:
+
+```java
+var assetsPath = themeRoot.resolve(themeName + "/templates/assets/" + resourcePaths);
+```
+
+### Asset URL Pattern
+
+Assets are served at:
+```
+/themes/{theme-name}/assets/{path-to-asset}
+```
+
+For example:
+- `/themes/my-theme/assets/css/style.css`
+- `/themes/my-theme/assets/js/main.js`
+- `/themes/my-theme/assets/images/logo.png`
+
+## Referencing Assets in Templates
+
+### Using the #theme.assets() Function
+
+The recommended way to reference assets is with the `#theme.assets()` function:
+
+```html
+<!-- CSS -->
+<link rel="stylesheet" th:href="@{${#theme.assets('/css/style.css')}}" />
+
+<!-- JavaScript -->
+<script th:src="@{${#theme.assets('/js/main.js')}}"></script>
+
+<!-- Images -->
+<img th:src="@{${#theme.assets('/images/logo.png')}}" alt="Logo" />
+
+<!-- Fonts in CSS -->
+@font-face {
+    font-family: 'CustomFont';
+    src: url('/assets/fonts/custom-font.woff2') format('woff2');
+}
+```
+
+### How #theme.assets() Works
+
+The function is implemented in `DefaultLinkExpressionFactory`:
+
+```java title="application/src/main/java/run/halo/app/theme/dialect/DefaultLinkExpressionFactory.java"
+public class ThemeLinkExpressObject {
+    public String assets(String path) {
+        String assetsPath = ThemeLinkBuilder.THEME_ASSETS_PREFIX + path;
+        return linkBuilder.buildLink(context, assetsPath, null);
+    }
+}
+```
+
+The link builder handles:
+- **Active themes**: Returns `/assets{path}` directly
+- **Preview mode**: Returns `/themes/{theme-name}/assets{path}`
+
+```java title="application/src/main/java/run/halo/app/theme/ThemeLinkBuilder.java"
+private boolean isAssetsRequest(String link) {
+    String assetsPrefix = externalUrlSupplier.get().resolve(THEME_ASSETS_PREFIX).toString();
+    return link.startsWith(assetsPrefix) || link.startsWith(THEME_ASSETS_PREFIX);
+}
+
+if (isAssetsRequest(link)) {
+    return PathUtils.combinePath(THEME_PREVIEW_PREFIX, theme.getName(), link);
+}
+```
+
+<Info>
+  Using `#theme.assets()` ensures your assets work correctly in both active and preview modes.
+</Info>
+
+## CSS Stylesheets
+
+### Linking Stylesheets
+
+```html
+<head>
+    <!-- Main stylesheet -->
+    <link rel="stylesheet" th:href="@{${#theme.assets('/css/style.css')}}" />
+    
+    <!-- Dark mode (conditional) -->
+    <link rel="stylesheet" 
+          th:href="@{${#theme.assets('/css/dark-mode.css')}}" 
+          th:if="${theme.config.darkMode}" />
+    
+    <!-- Print styles -->
+    <link rel="stylesheet" 
+          th:href="@{${#theme.assets('/css/print.css')}}" 
+          media="print" />
+</head>
+```
+
+### Inline Styles
+
+For small, dynamic styles:
+
+```html
+<style th:inline="text">
+    :root {
+        --primary-color: [[${theme.config.primaryColor}]];
+        --font-family: [[${theme.config.fontFamily}]];
+    }
+</style>
+```
+
+### CSS Best Practices
+
+<Steps>
+  <Step title="Use CSS Variables">
+    Define customizable values as CSS variables:
+    
+    ```css
+    :root {
+        --primary-color: #007bff;
+        --secondary-color: #6c757d;
+        --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
+        --spacing-unit: 1rem;
+    }
+    ```
+  </Step>
+
+  <Step title="Organize with Comments">
+    Structure your CSS with clear sections:
+    
+    ```css
+    /* ==========================================================================
+       Typography
+       ========================================================================== */
+    
+    /* ==========================================================================
+       Layout
+       ========================================================================== */
+    ```
+  </Step>
+
+  <Step title="Use Responsive Design">
+    Implement mobile-first responsive layouts:
+    
+    ```css
+    .container {
+        padding: 1rem;
+    }
+    
+    @media (min-width: 768px) {
+        .container {
+            padding: 2rem;
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+## JavaScript Files
+
+### Loading Scripts
+
+```html
+<body>
+    <!-- Content -->
+    
+    <!-- Scripts at end of body for better performance -->
+    <script th:src="@{${#theme.assets('/js/vendor/jquery.min.js')}}"></script>
+    <script th:src="@{${#theme.assets('/js/main.js')}}"></script>
+</body>
+```
+
+### Async and Defer
+
+```html
+<!-- Non-critical scripts - load asynchronously -->
+<script th:src="@{${#theme.assets('/js/analytics.js')}}" async></script>
+
+<!-- Scripts that depend on DOM - defer until parsing complete -->
+<script th:src="@{${#theme.assets('/js/ui-enhancements.js')}}" defer></script>
+```
+
+### Inline Scripts with Template Data
+
+```html
+<script th:inline="javascript">
+    const siteConfig = {
+        title: /*[[${site.title}]]*/ 'Default Title',
+        baseUrl: /*[[${site.url}]]*/ 'https://example.com',
+        theme: {
+            primaryColor: /*[[${theme.config.primaryColor}]]*/ '#007bff'
+        }
+    };
+    
+    console.log('Site:', siteConfig.title);
+</script>
+```
+
+### Module Scripts
+
+```html
+<script type="module" th:src="@{${#theme.assets('/js/app.js')}}"></script>
+```
+
+## Images
+
+### Image References
+
+```html
+<!-- Logo -->
+<img th:src="@{${#theme.assets('/images/logo.png')}}" 
+     alt="Site Logo" 
+     width="200" 
+     height="60" />
+
+<!-- Default avatar fallback -->
+<img th:src="${user.avatar} ?: ${#theme.assets('/images/default-avatar.png')}" 
+     th:alt="${user.name}" />
+
+<!-- Background image in CSS -->
+<div class="hero" 
+     th:style="'background-image: url(' + ${#theme.assets('/images/hero-bg.jpg')} + ')'"></div>
+```
+
+### Responsive Images
+
+```html
+<picture>
+    <source th:srcset="@{${#theme.assets('/images/hero-large.jpg')}}" 
+            media="(min-width: 1200px)" />
+    <source th:srcset="@{${#theme.assets('/images/hero-medium.jpg')}}" 
+            media="(min-width: 768px)" />
+    <img th:src="@{${#theme.assets('/images/hero-small.jpg')}}" 
+         alt="Hero Image" />
+</picture>
+```
+
+### Image Optimization Tips
+
+<CardGroup cols={2}>
+  <Card title="Use Modern Formats" icon="image">
+    Provide WebP or AVIF formats with fallbacks:
+    ```html
+    <picture>
+        <source type="image/webp" srcset="image.webp" />
+        <img src="image.jpg" alt="..." />
+    </picture>
+    ```
+  </Card>
+
+  <Card title="Lazy Loading" icon="hourglass">
+    Use native lazy loading for images:
+    ```html
+    <img src="..." loading="lazy" alt="..." />
+    ```
+  </Card>
+
+  <Card title="Proper Sizing" icon="arrows-maximize">
+    Always specify width and height to prevent layout shift:
+    ```html
+    <img src="..." width="800" height="600" alt="..." />
+    ```
+  </Card>
+
+  <Card title="Compression" icon="compress">
+    Compress images before including them in your theme using tools like ImageOptim or Squoosh.
+  </Card>
+</CardGroup>
+
+## Fonts
+
+### Custom Web Fonts
+
+```css title="templates/assets/css/fonts.css"
+@font-face {
+    font-family: 'CustomFont';
+    src: url('/assets/fonts/custom-font.woff2') format('woff2'),
+         url('/assets/fonts/custom-font.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+body {
+    font-family: 'CustomFont', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+```
+
+### Google Fonts
+
+```html
+<head>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" 
+          rel="stylesheet" />
+</head>
+```
+
+## Vendor Libraries
+
+### Organizing Third-Party Assets
+
+Keep vendor files separate from your custom code:
+
+```
+templates/assets/
+├── css/
+│   ├── style.css          # Your custom styles
+│   └── vendor/
+│       ├── normalize.css
+│       └── highlight.css
+└── js/
+    ├── main.js            # Your custom scripts
+    └── vendor/
+        ├── jquery.min.js
+        └── highlight.min.js
+```
+
+### Loading Order
+
+```html
+<!-- Load vendor libraries first -->
+<script th:src="@{${#theme.assets('/js/vendor/jquery.min.js')}}"></script>
+<script th:src="@{${#theme.assets('/js/vendor/bootstrap.bundle.min.js')}}"></script>
+
+<!-- Then load your custom scripts -->
+<script th:src="@{${#theme.assets('/js/main.js')}}"></script>
+```
+
+## Asset Caching
+
+Halo configures caching for theme assets based on Spring Boot's resource properties:
+
+```java title="application/src/main/java/run/halo/app/theme/config/ThemeWebFluxConfigurer.java"
+var cacheControl = resourcesProperties.getCache().getCachecontrol().toHttpCacheControl();
+var useLastModified = resourcesProperties.getCache().isUseLastModified();
+
+registry.addResourceHandler("/themes/{themeName}/assets/{*resourcePaths}")
+    .setCacheControl(cacheControl)
+    .setUseLastModified(useLastModified)
+    .resourceChain(true)
+    .addResolver(new EncodedResourceResolver())
+    .addResolver(new ThemePathResourceResolver(themeRootGetter.get()));
+```
+
+### Cache Busting
+
+For development or when assets change frequently, append version query parameters:
+
+```html
+<link rel="stylesheet" 
+      th:href="@{${#theme.assets('/css/style.css')} + '?v=' + ${theme.spec.version}}" />
+```
+
+## Performance Optimization
+
+<Steps>
+  <Step title="Minimize HTTP Requests">
+    Combine CSS and JavaScript files where possible:
+    
+    ```html
+    <!-- Instead of multiple CSS files -->
+    <link rel="stylesheet" th:href="@{${#theme.assets('/css/bundle.css')}}" />
+    ```
+  </Step>
+
+  <Step title="Minify Assets">
+    Use minified versions of CSS and JavaScript in production:
+    
+    ```
+    assets/css/
+    ├── style.css        # Development
+    └── style.min.css    # Production
+    ```
+  </Step>
+
+  <Step title="Use CDNs for Common Libraries">
+    Load popular libraries from CDNs:
+    
+    ```html
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"
+            integrity="sha256-..."
+            crossorigin="anonymous"></script>
+    ```
+  </Step>
+
+  <Step title="Lazy Load Non-Critical Assets">
+    Load images and scripts only when needed:
+    
+    ```html
+    <img src="..." loading="lazy" />
+    <script src="..." defer></script>
+    ```
+  </Step>
+
+  <Step title="Enable Compression">
+    The `EncodedResourceResolver` automatically serves pre-compressed assets (`.gz`, `.br`) if available.
+  </Step>
+</Steps>
+
+## Example: Complete Asset Setup
+
+```html title="templates/partials/head.html"
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="description" th:content="${site.description}" />
+    
+    <!-- Title -->
+    <title th:text="${title} + ' - ' + ${site.title}">Page Title - Site</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" 
+          th:href="@{${site.favicon} ?: ${#theme.assets('/images/favicon.png')}}" />
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" 
+          rel="stylesheet" />
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" th:href="@{${#theme.assets('/css/normalize.css')}}" />
+    <link rel="stylesheet" th:href="@{${#theme.assets('/css/style.css')}}" />
+    <link rel="stylesheet" 
+          th:href="@{${#theme.assets('/css/dark-mode.css')}}" 
+          th:if="${theme.config.darkMode}" />
+    
+    <!-- Theme configuration -->
+    <style th:inline="text">
+        :root {
+            --primary-color: [[${theme.config.primaryColor ?: '#007bff'}]];
+            --font-family: [[${theme.config.fontFamily ?: 'Inter, sans-serif'}]];
+        }
+    </style>
+    
+    <!-- Analytics (async) -->
+    <script th:if="${theme.config.analytics}" 
+            th:src="@{${#theme.assets('/js/analytics.js')}}" 
+            async></script>
+</head>
+</html>
+```
+
+```html title="templates/partials/footer.html"
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+    <div th:fragment="scripts">
+        <!-- Vendor libraries -->
+        <script th:src="@{${#theme.assets('/js/vendor/jquery.min.js')}}"></script>
+        
+        <!-- Main application script -->
+        <script th:src="@{${#theme.assets('/js/main.js')}}"></script>
+        
+        <!-- Optional: Search functionality -->
+        <script th:if="${theme.config.enableSearch}" 
+                th:src="@{${#theme.assets('/js/search.js')}}" 
+                defer></script>
+    </div>
+</body>
+</html>
+```
+
+## Security Considerations
+
+<Warning>
+  Always validate and sanitize any user input before using it in asset URLs or inline scripts to prevent XSS attacks.
+</Warning>
+
+### Subresource Integrity (SRI)
+
+When loading assets from CDNs, use SRI hashes:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"
+        integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
+        crossorigin="anonymous"></script>
+```
+
+### Content Security Policy
+
+Consider implementing CSP headers to restrict asset sources:
+
+```html
+<meta http-equiv="Content-Security-Policy" 
+      content="default-src 'self'; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src fonts.gstatic.com;" />
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="./configuration">
+    Learn how to configure theme settings and options
+  </Card>
+
+  <Card title="Templates" icon="file-code" href="./templates">
+    Master Thymeleaf template development
+  </Card>
+</CardGroup>

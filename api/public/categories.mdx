@@ -1,0 +1,215 @@
+---
+title: Categories API
+description: Public API endpoints for managing and retrieving post categories
+---
+
+The Categories API provides endpoints to list, retrieve, and query posts by category in your Halo CMS.
+
+## List Categories
+
+Retrieves a paginated list of categories.
+
+<CodeGroup>
+```bash cURL
+curl -X GET "http://localhost:8091/apis/api.content.halo.run/v1alpha1/categories?page=0&size=10" \
+  -H "Accept: application/json"
+```
+</CodeGroup>
+
+### Query Parameters
+
+<ParamField query="page" type="integer" default="0">
+  Page number. Default is 0.
+</ParamField>
+
+<ParamField query="size" type="integer" default="0">
+  Size number. Default is 0.
+</ParamField>
+
+<ParamField query="labelSelector" type="array">
+  Label selector. e.g.: `hidden!=true`
+</ParamField>
+
+<ParamField query="fieldSelector" type="array">
+  Field selector. e.g.: `metadata.name==halo`
+</ParamField>
+
+<ParamField query="sort" type="array">
+  Sorting criteria in the format: `property,(asc|desc)`. Default sort order is ascending. Multiple sort criteria are supported.
+</ParamField>
+
+### Response
+
+Returns a `CategoryVoList` object containing paginated category results.
+
+<ResponseField name="items" type="array">
+  Array of category objects.
+  
+  <ResponseField name="metadata" type="Metadata" required>
+    Category metadata including name, labels, and timestamps.
+  </ResponseField>
+  
+  <ResponseField name="spec" type="CategorySpec">
+    Category specification.
+    
+    <ResponseField name="displayName" type="string" required>
+      Display name of the category.
+    </ResponseField>
+    
+    <ResponseField name="slug" type="string" required>
+      Category slug for URL.
+    </ResponseField>
+    
+    <ResponseField name="description" type="string">
+      Category description.
+    </ResponseField>
+    
+    <ResponseField name="cover" type="string">
+      Cover image URL.
+    </ResponseField>
+    
+    <ResponseField name="priority" type="integer" default="0">
+      Category priority for ordering.
+    </ResponseField>
+    
+    <ResponseField name="children" type="array">
+      Array of child category names.
+    </ResponseField>
+    
+    <ResponseField name="hideFromList" type="boolean">
+      Whether to hide the category from the category list. When set to true, the category including its subcategories and related posts will not be displayed in the category list, but can still be accessed by permalink.
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="status" type="CategoryStatus">
+    Category status information.
+    
+    <ResponseField name="permalink" type="string">
+      Permanent link to the category.
+    </ResponseField>
+    
+    <ResponseField name="postCount" type="integer">
+      Total number of posts including all nested levels.
+    </ResponseField>
+    
+    <ResponseField name="visiblePostCount" type="integer">
+      Number of published and public posts including all nested levels.
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="postCount" type="integer">
+    Number of posts in this category.
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="page" type="integer">
+  Current page number, starts from 1.
+</ResponseField>
+
+<ResponseField name="size" type="integer">
+  Size of each page.
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of categories.
+</ResponseField>
+
+<ResponseField name="totalPages" type="integer">
+  Total number of pages.
+</ResponseField>
+
+<ResponseField name="first" type="boolean">
+  Whether this is the first page.
+</ResponseField>
+
+<ResponseField name="last" type="boolean">
+  Whether this is the last page.
+</ResponseField>
+
+<ResponseField name="hasNext" type="boolean">
+  Whether there is a next page.
+</ResponseField>
+
+<ResponseField name="hasPrevious" type="boolean">
+  Whether there is a previous page.
+</ResponseField>
+
+## Get Category by Name
+
+Retrieves a single category by its name.
+
+<CodeGroup>
+```bash cURL
+curl -X GET "http://localhost:8091/apis/api.content.halo.run/v1alpha1/categories/{name}" \
+  -H "Accept: application/json"
+```
+</CodeGroup>
+
+### Path Parameters
+
+<ParamField path="name" type="string" required>
+  Category name (unique identifier).
+</ParamField>
+
+### Response
+
+Returns a `CategoryVo` object.
+
+<ResponseField name="metadata" type="Metadata" required>
+  Category metadata.
+</ResponseField>
+
+<ResponseField name="spec" type="CategorySpec">
+  Category specification.
+</ResponseField>
+
+<ResponseField name="status" type="CategoryStatus">
+  Category status.
+</ResponseField>
+
+<ResponseField name="postCount" type="integer">
+  Number of posts in this category.
+</ResponseField>
+
+## List Posts by Category
+
+Retrieves all posts belonging to a specific category.
+
+<CodeGroup>
+```bash cURL
+curl -X GET "http://localhost:8091/apis/api.content.halo.run/v1alpha1/categories/{name}/posts?page=0&size=10" \
+  -H "Accept: application/json"
+```
+</CodeGroup>
+
+### Path Parameters
+
+<ParamField path="name" type="string" required>
+  Category name (unique identifier).
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="page" type="integer" default="0">
+  Page number. Default is 0.
+</ParamField>
+
+<ParamField query="size" type="integer" default="0">
+  Size number. Default is 0.
+</ParamField>
+
+<ParamField query="labelSelector" type="array">
+  Label selector. e.g.: `hidden!=true`
+</ParamField>
+
+<ParamField query="fieldSelector" type="array">
+  Field selector. e.g.: `metadata.name==halo`
+</ParamField>
+
+<ParamField query="sort" type="array">
+  Sorting criteria in the format: `property,(asc|desc)`. Default sort order is ascending. Multiple sort criteria are supported.
+</ParamField>
+
+### Response
+
+Returns a `ListedPostVoList` object containing posts in the specified category.

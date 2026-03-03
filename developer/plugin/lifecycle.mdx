@@ -1,0 +1,379 @@
+---
+title: Plugin Lifecycle Management
+description: Understand how plugins are loaded, started, stopped, and unloaded in Halo
+---
+
+Halo's plugin system manages the entire lifecycle of plugins, from installation to removal. Understanding this lifecycle is crucial for proper plugin development.
+
+## Plugin States
+
+Plugins go through several states managed by the system:
+
+```java
+public enum Phase {
+    PENDING,    // Plugin is queued for processing
+    STARTING,   // Plugin is being started
+    CREATED,    // Plugin resources created
+    DISABLING,  // Plugin is being disabled
+    DISABLED,   // Plugin is disabled
+    RESOLVED,   // Plugin dependencies resolved
+    STARTED,    // Plugin is running
+    STOPPED,    // Plugin is stopped
+    FAILED,     // Plugin failed to start
+    UNKNOWN     // Unknown state
+}
+```
+
+## Lifecycle Phases
+
+<Steps>
+
+### Installation
+
+When a plugin is uploaded:
+
+1. Plugin JAR is extracted to `${halo.work-dir}/plugins`
+2. `plugin.yaml` is parsed
+3. Dependencies are checked
+4. Plugin metadata is registered as a `Plugin` Extension
+5. State: `PENDING`
+
+### Resolution
+
+The system resolves plugin dependencies:
+
+1. Checks `spec.requires` for Halo version compatibility
+2. Resolves `spec.pluginDependencies` to ensure required plugins exist
+3. Validates `@GVK` annotations on Extension classes
+4. State: `RESOLVED`
+
+### Creation
+
+The plugin is instantiated:
+
+1. Spring application context is created for the plugin
+2. Plugin class constructor is called with `PluginContext`
+3. All `@Component`, `@Service`, etc. are scanned and registered
+4. Extensions from `extensions/` directory are loaded
+5. State: `CREATED`
+
+### Starting
+
+The plugin becomes active:
+
+1. `PluginStartedEvent` is published within the plugin context
+2. `Reconciler` implementations are registered with the controller manager
+3. `CustomEndpoint` implementations are registered with the router
+4. Event listeners start receiving events
+5. State: `STARTED`
+
+### Stopping
+
+When a plugin is disabled or updated:
+
+1. Event listeners are unregistered
+2. Reconcilers are stopped
+3. Custom endpoints are removed
+4. Spring context is closed
+5. State: `STOPPED`
+
+### Uninstallation
+
+When a plugin is removed:
+
+1. Plugin is stopped (if running)
+2. All Extensions created by the plugin are deleted
+3. Plugin files are removed from disk
+4. Plugin metadata is deleted
+
+</Steps>
+
+## Lifecycle Events
+
+### PluginStartedEvent
+
+Published when a plugin successfully starts:
+
+```java
+package run.halo.app.plugin.event;
+
+import org.springframework.context.ApplicationEvent;
+
+/**
+ * Published when a plugin is really started.
+ * This event is only for plugin internal use.
+ */
+public class PluginStartedEvent extends ApplicationEvent {
+    public PluginStartedEvent(Object source) {
+        super(source);
+    }
+}
+```
+
+**Usage in your plugin:**
+
+```java
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Component;
+import run.halo.app.plugin.event.PluginStartedEvent;
+
+@Component
+public class MyPluginListener {
+    
+    @EventListener
+    public void onPluginStarted(PluginStartedEvent event) {
+        // Plugin has started, initialize resources
+        log.info("Plugin started successfully");
+        initializeResources();
+    }
+    
+    private void initializeResources() {
+        // Create default data, register schedules, etc.
+    }
+}
+```
+
+### PluginConfigUpdatedEvent
+
+Published when plugin configuration changes:
+
+```java
+import run.halo.app.plugin.PluginConfigUpdatedEvent;
+
+@Component
+public class ConfigListener {
+    
+    @EventListener
+    public void onConfigUpdated(PluginConfigUpdatedEvent event) {
+        var oldSettings = event.getOldSettingValues();
+        var newSettings = event.getNewSettingValues();
+        
+        // React to configuration changes
+        log.info("Configuration updated");
+        reloadConfiguration(newSettings);
+    }
+}
+```
+
+<Note>
+The `PluginConfigUpdatedEvent` is triggered when the ConfigMap referenced by `spec.configMapName` in the plugin descriptor is modified.
+</Note>
+
+## Plugin Context Access
+
+The `PluginContext` provides access to plugin information throughout its lifecycle:
+
+```java
+@Component
+public class MyComponent {
+    private final PluginContext context;
+    
+    public MyComponent(PluginContext context) {
+        this.context = context;
+    }
+    
+    public void logPluginInfo() {
+        log.info("Plugin name: {}", context.getName());
+        log.info("Plugin version: {}", context.getVersion());
+        log.info("ConfigMap: {}", context.getConfigMapName());
+        log.info("Runtime mode: {}", context.getRuntimeMode());
+    }
+}
+```
+
+## Runtime Modes
+
+Plugins can detect the runtime environment:
+
+```java
+import org.pf4j.RuntimeMode;
+
+@Component
+public class MyPlugin extends BasePlugin {
+    
+    public MyPlugin(PluginContext context) {
+        super(context);
+        
+        RuntimeMode mode = context.getRuntimeMode();
+        
+        if (mode.isDevelopment()) {
+            log.info("Running in DEVELOPMENT mode");
+            // Enable debug features, verbose logging
+        } else {
+            log.info("Running in DEPLOYMENT mode");
+            // Optimize for production
+        }
+    }
+}
+```
+
+## Graceful Shutdown
+
+Handle cleanup when your plugin stops:
+
+```java
+import jakarta.annotation.PreDestroy;
+import org.springframework.stereotype.Component;
+
+@Component
+public class ResourceManager {
+    private final ScheduledExecutorService scheduler = 
+        Executors.newScheduledThreadPool(1);
+    
+    public ResourceManager() {
+        // Initialize resources
+        scheduler.scheduleAtFixedRate(
+            this::performTask, 
+            0, 1, TimeUnit.HOURS
+        );
+    }
+    
+    @PreDestroy
+    public void cleanup() {
+        log.info("Shutting down scheduled tasks...");
+        scheduler.shutdown();
+        try {
+            if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                scheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            scheduler.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+    
+    private void performTask() {
+        // Periodic task
+    }
+}
+```
+
+## Extension Registration
+
+Extensions are automatically registered from the `extensions/` directory:
+
+```yaml
+# extensions/my-extension.yaml
+apiVersion: myplugin.example.com/v1alpha1
+kind: MyResource
+metadata:
+  name: default-resource
+spec:
+  title: Default Resource
+  content: This is created when the plugin starts
+```
+
+**Programmatic registration:**
+
+```java
+import run.halo.app.extension.ReactiveExtensionClient;
+import run.halo.app.plugin.event.PluginStartedEvent;
+
+@Component
+public class ExtensionInitializer {
+    private final ReactiveExtensionClient client;
+    
+    public ExtensionInitializer(ReactiveExtensionClient client) {
+        this.client = client;
+    }
+    
+    @EventListener
+    public void onPluginStarted(PluginStartedEvent event) {
+        createDefaultExtensions();
+    }
+    
+    private void createDefaultExtensions() {
+        var resource = new MyResource();
+        resource.setMetadata(new Metadata());
+        resource.getMetadata().setName("default-resource");
+        resource.setSpec(new MyResourceSpec());
+        resource.getSpec().setTitle("Default Resource");
+        
+        client.create(resource)
+            .doOnSuccess(r -> log.info("Created default resource"))
+            .doOnError(e -> log.error("Failed to create resource", e))
+            .subscribe();
+    }
+}
+```
+
+## Dependency Management
+
+Specify dependencies on other plugins:
+
+```yaml
+# plugin.yaml
+apiVersion: plugin.halo.run/v1alpha1
+kind: Plugin
+metadata:
+  name: my-plugin
+spec:
+  version: 1.0.0
+  requires: ">=2.0.0"  # Halo version
+  pluginDependencies:
+    another-plugin: ">=1.0.0"  # Other plugin dependency
+    utility-plugin: "^2.1.0"
+```
+
+<Warning>
+If a required plugin is not installed or doesn't meet the version requirement, your plugin will not start.
+</Warning>
+
+## State Monitoring
+
+You can query plugin state through the Extension API:
+
+```java
+@Service
+public class PluginMonitor {
+    private final ExtensionClient client;
+    
+    public PluginMonitor(ExtensionClient client) {
+        this.client = client;
+    }
+    
+    public Optional<Plugin.Phase> getPluginPhase(String pluginName) {
+        return client.fetch(Plugin.class, pluginName)
+            .map(plugin -> plugin.statusNonNull().getPhase());
+    }
+    
+    public boolean isPluginRunning(String pluginName) {
+        return getPluginPhase(pluginName)
+            .map(phase -> phase == Plugin.Phase.STARTED)
+            .orElse(false);
+    }
+}
+```
+
+## Best Practices
+
+<Tip>
+- Listen to `PluginStartedEvent` to initialize resources
+- Use `@PreDestroy` for cleanup logic
+- Handle configuration updates with `PluginConfigUpdatedEvent`
+- Check runtime mode to enable development features
+- Always clean up resources (threads, connections, files) on shutdown
+- Test your plugin's behavior across state transitions
+</Tip>
+
+<Warning>
+Do not perform blocking operations in lifecycle event handlers. Use reactive or asynchronous patterns when possible.
+</Warning>
+
+## Debugging Lifecycle Issues
+
+Common issues and solutions:
+
+| Issue | Possible Cause | Solution |
+|-------|----------------|----------|
+| Plugin stuck in PENDING | Dependency not met | Check `spec.requires` and `pluginDependencies` |
+| Plugin moves to FAILED | Startup exception | Check logs for stack traces |
+| Plugin won't stop | Resource not released | Implement `@PreDestroy` methods |
+| Extensions not loaded | Invalid YAML | Validate YAML syntax and schema |
+
+## Next Steps
+
+- Learn to create [custom extensions](/developer/plugin/api-extension)
+- Add [custom endpoints](/developer/plugin/custom-endpoints)
+- Configure [plugin settings](/developer/plugin/configuration)
+- Handle [plugin events](/developer/plugin/events)

@@ -1,0 +1,534 @@
+---
+title: Event Handling
+description: Learn how to publish and subscribe to events in Halo plugins
+---
+
+Halo's event system enables communication between the core application and plugins, as well as between different plugins. Events are built on Spring's ApplicationEvent framework.
+
+## Event Types
+
+There are two main categories of events:
+
+1. **Shared Events**: Events that can be subscribed to by both the core and all plugins
+2. **Internal Events**: Events that are only visible within a plugin's context
+
+## SharedEvent Annotation
+
+The `@SharedEvent` annotation marks events that should be broadcast across the system:
+
+```java
+package run.halo.app.plugin;
+
+import java.lang.annotation.*;
+
+/**
+ * When an event is marked with @SharedEvent, it will be
+ * broadcast to the application context of all plugins.
+ */
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+public @interface SharedEvent {
+}
+```
+
+<Note>
+Only events annotated with `@SharedEvent` can be received by other plugins or the core application.
+</Note>
+
+## Subscribing to Events
+
+There are two ways to subscribe to events:
+
+### Using ApplicationListener
+
+```java
+import org.springframework.context.ApplicationListener;
+import org.springframework.stereotype.Component;
+import run.halo.app.event.post.PostPublishedEvent;
+
+@Component
+public class PostPublishedEventListener 
+    implements ApplicationListener<PostPublishedEvent> {
+    
+    @Override
+    public void onApplicationEvent(PostPublishedEvent event) {
+        var post = event.getPost();
+        log.info("Post published: {}", post.getSpec().getTitle());
+        
+        // Handle the event
+        sendNotification(post);
+    }
+    
+    private void sendNotification(Post post) {
+        // Send email, webhook, etc.
+    }
+}
+```
+
+### Using @EventListener
+
+```java
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Component;
+import run.halo.app.event.post.PostPublishedEvent;
+
+@Component
+public class PostEventHandler {
+    
+    @EventListener
+    public void onPostPublished(PostPublishedEvent event) {
+        var post = event.getPost();
+        log.info("Post published: {}", post.getSpec().getTitle());
+        
+        // Handle the event
+    }
+    
+    @EventListener
+    public void onPostUpdated(PostUpdatedEvent event) {
+        var post = event.getPost();
+        log.info("Post updated: {}", post.getSpec().getTitle());
+    }
+}
+```
+
+### Async Event Handling
+
+```java
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Component;
+
+@Component
+public class AsyncPostEventHandler {
+    
+    @Async
+    @EventListener
+    public void onPostPublished(PostPublishedEvent event) {
+        // This runs asynchronously
+        log.info("Async handling post published event");
+        
+        // Perform time-consuming operations
+        generateStatistics(event.getPost());
+        updateSearchIndex(event.getPost());
+    }
+}
+```
+
+<Tip>
+Use `@Async` for time-consuming event handlers to avoid blocking the event publisher.
+</Tip>
+
+## Publishing Events
+
+### Using ApplicationEventPublisher
+
+```java
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+
+@Service
+public class ArticleService {
+    private final ApplicationEventPublisher eventPublisher;
+    private final ReactiveExtensionClient client;
+    
+    public ArticleService(
+        ApplicationEventPublisher eventPublisher,
+        ReactiveExtensionClient client
+    ) {
+        this.eventPublisher = eventPublisher;
+        this.client = client;
+    }
+    
+    public Mono<Article> publishArticle(String name) {
+        return client.fetch(Article.class, name)
+            .flatMap(article -> {
+                article.getSpec().setPublished(true);
+                article.getSpec().setPublishTime(Instant.now());
+                return client.update(article);
+            })
+            .doOnSuccess(article -> {
+                // Publish event after successful update
+                eventPublisher.publishEvent(
+                    new ArticlePublishedEvent(this, article)
+                );
+            });
+    }
+}
+```
+
+## Creating Custom Events
+
+### Shared Event (Cross-Plugin)
+
+```java
+import org.springframework.context.ApplicationEvent;
+import run.halo.app.plugin.SharedEvent;
+
+@SharedEvent
+public class ArticlePublishedEvent extends ApplicationEvent {
+    private final Article article;
+    
+    public ArticlePublishedEvent(Object source, Article article) {
+        super(source);
+        this.article = article;
+    }
+    
+    public Article getArticle() {
+        return article;
+    }
+}
+```
+
+<Warning>
+If you want other plugins to subscribe to your events, you must:
+1. Annotate the event with `@SharedEvent`
+2. Extend `ApplicationEvent`
+3. Publish the event class as a Maven artifact for other plugins to depend on
+</Warning>
+
+### Internal Event (Plugin-Only)
+
+```java
+import org.springframework.context.ApplicationEvent;
+
+// No @SharedEvent annotation - only visible within this plugin
+public class CacheInvalidatedEvent extends ApplicationEvent {
+    private final String cacheKey;
+    
+    public CacheInvalidatedEvent(Object source, String cacheKey) {
+        super(source);
+        this.cacheKey = cacheKey;
+    }
+    
+    public String getCacheKey() {
+        return cacheKey;
+    }
+}
+```
+
+## Built-in Events
+
+Halo provides several built-in shared events:
+
+### Plugin Events
+
+```java
+import run.halo.app.plugin.event.PluginStartedEvent;
+
+@Component
+public class PluginLifecycleListener {
+    
+    @EventListener
+    public void onPluginStarted(PluginStartedEvent event) {
+        log.info("Plugin started");
+        // Initialize resources, create default data, etc.
+    }
+}
+```
+
+### Configuration Events
+
+```java
+import run.halo.app.plugin.PluginConfigUpdatedEvent;
+import tools.jackson.databind.JsonNode;
+
+@Component
+public class ConfigListener {
+    
+    @EventListener
+    public void onConfigUpdated(PluginConfigUpdatedEvent event) {
+        Map<String, JsonNode> newSettings = event.getNewSettingValues();
+        Map<String, JsonNode> oldSettings = event.getOldSettingValues();
+        
+        log.info("Configuration changed");
+        reloadConfiguration(newSettings);
+    }
+}
+```
+
+### Post Events (Example)
+
+```java
+import run.halo.app.event.post.PostPublishedEvent;
+import run.halo.app.event.post.PostUpdatedEvent;
+
+@Component
+public class PostEventListener {
+    
+    @EventListener
+    public void onPostPublished(PostPublishedEvent event) {
+        var post = event.getPost();
+        log.info("New post published: {}", post.getSpec().getTitle());
+        
+        // Send notifications, update RSS, etc.
+    }
+    
+    @EventListener
+    public void onPostUpdated(PostUpdatedEvent event) {
+        var post = event.getPost();
+        log.info("Post updated: {}", post.getSpec().getTitle());
+        
+        // Clear cache, reindex, etc.
+    }
+}
+```
+
+## Event Ordering
+
+### @Order Annotation
+
+```java
+import org.springframework.core.annotation.Order;
+import org.springframework.context.event.EventListener;
+
+@Component
+public class OrderedEventHandlers {
+    
+    @Order(1)  // Runs first
+    @EventListener
+    public void handleFirst(PostPublishedEvent event) {
+        log.info("First handler");
+    }
+    
+    @Order(2)  // Runs second
+    @EventListener
+    public void handleSecond(PostPublishedEvent event) {
+        log.info("Second handler");
+    }
+    
+    @Order(3)  // Runs third
+    @EventListener
+    public void handleThird(PostPublishedEvent event) {
+        log.info("Third handler");
+    }
+}
+```
+
+## Conditional Event Listening
+
+### Using SpEL Conditions
+
+```java
+@Component
+public class ConditionalEventListener {
+    
+    // Only handle events where post is published
+    @EventListener(condition = "#event.post.spec.published == true")
+    public void onPublishedPostOnly(PostUpdatedEvent event) {
+        log.info("Published post updated");
+    }
+    
+    // Only handle specific event properties
+    @EventListener(condition = "#event.article.metadata.name.startsWith('featured-')")
+    public void onFeaturedArticle(ArticlePublishedEvent event) {
+        log.info("Featured article published");
+    }
+}
+```
+
+## Transaction Events
+
+### @TransactionalEventListener
+
+```java
+import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.event.TransactionPhase;
+
+@Component
+public class TransactionalEventHandler {
+    
+    // Execute after transaction commits
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleAfterCommit(ArticlePublishedEvent event) {
+        log.info("Article saved successfully, sending notifications");
+        sendEmailNotifications(event.getArticle());
+    }
+    
+    // Execute before transaction commits
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+    public void handleBeforeCommit(ArticlePublishedEvent event) {
+        log.info("About to commit article changes");
+        validateBeforeCommit(event.getArticle());
+    }
+    
+    // Execute after transaction rolls back
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_ROLLBACK)
+    public void handleAfterRollback(ArticlePublishedEvent event) {
+        log.error("Transaction rolled back");
+        cleanupFailedOperation(event.getArticle());
+    }
+}
+```
+
+## Error Handling in Events
+
+```java
+@Component
+public class SafeEventHandler {
+    
+    @EventListener
+    public void handlePostPublished(PostPublishedEvent event) {
+        try {
+            processEvent(event);
+        } catch (Exception e) {
+            log.error("Error handling post published event", e);
+            // Don't re-throw - prevents breaking other listeners
+        }
+    }
+    
+    private void processEvent(PostPublishedEvent event) {
+        // Event processing logic
+    }
+}
+```
+
+<Warning>
+If an event listener throws an exception, it may prevent other listeners from receiving the event. Always handle exceptions within your listeners.
+</Warning>
+
+## Publishing Events to Other Plugins
+
+To share events between plugins:
+
+<Steps>
+
+### Create a shared library
+
+Create a separate Maven module with your event classes:
+
+```java
+// my-plugin-api module
+package com.example.myplugin.event;
+
+import org.springframework.context.ApplicationEvent;
+import run.halo.app.plugin.SharedEvent;
+
+@SharedEvent
+public class ArticlePublishedEvent extends ApplicationEvent {
+    private final String articleName;
+    
+    public ArticlePublishedEvent(Object source, String articleName) {
+        super(source);
+        this.articleName = articleName;
+    }
+    
+    public String getArticleName() {
+        return articleName;
+    }
+}
+```
+
+### Publish to Maven repository
+
+Publish the API module to Maven Central or a private repository.
+
+### Other plugins depend on it
+
+```xml
+<dependency>
+    <groupId>com.example</groupId>
+    <artifactId>my-plugin-api</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+### Subscribe to the event
+
+```java
+import com.example.myplugin.event.ArticlePublishedEvent;
+
+@Component
+public class OtherPluginListener {
+    
+    @EventListener
+    public void onArticlePublished(ArticlePublishedEvent event) {
+        log.info("Article published: {}", event.getArticleName());
+        // Handle in another plugin
+    }
+}
+```
+
+</Steps>
+
+## Practical Examples
+
+### Example: Search Index Plugin
+
+```java
+@Component
+public class SearchIndexer {
+    private final SearchService searchService;
+    
+    public SearchIndexer(SearchService searchService) {
+        this.searchService = searchService;
+    }
+    
+    @Async
+    @EventListener
+    public void indexPost(PostPublishedEvent event) {
+        searchService.indexPost(event.getPost());
+    }
+    
+    @Async
+    @EventListener
+    public void reindexPost(PostUpdatedEvent event) {
+        searchService.reindexPost(event.getPost());
+    }
+    
+    @Async
+    @EventListener
+    public void removeFromIndex(PostDeletedEvent event) {
+        searchService.removePost(event.getPostName());
+    }
+}
+```
+
+### Example: Analytics Plugin
+
+```java
+@Component
+public class AnalyticsCollector {
+    private final AnalyticsService analyticsService;
+    
+    public AnalyticsCollector(AnalyticsService analyticsService) {
+        this.analyticsService = analyticsService;
+    }
+    
+    @EventListener
+    public void trackPostView(PostViewedEvent event) {
+        analyticsService.recordView(
+            event.getPostName(),
+            event.getVisitorIp(),
+            event.getUserAgent()
+        );
+    }
+    
+    @EventListener
+    public void trackPostPublish(PostPublishedEvent event) {
+        analyticsService.recordPublish(
+            event.getPost().getMetadata().getName(),
+            event.getPost().getSpec().getAuthor(),
+            Instant.now()
+        );
+    }
+}
+```
+
+## Best Practices
+
+<Tip>
+- Use `@SharedEvent` only for events that need to be consumed by other plugins
+- Keep event payloads lightweight; pass IDs instead of full objects when possible
+- Use `@Async` for time-consuming operations
+- Always handle exceptions within event listeners
+- Use `@Order` to control execution sequence when needed
+- Document your shared events clearly for other plugin developers
+- Publish event classes as separate artifacts for cross-plugin communication
+</Tip>
+
+## Next Steps
+
+- Learn about [plugin lifecycle](/developer/plugin/lifecycle)
+- Create [custom endpoints](/developer/plugin/custom-endpoints)
+- Configure [plugin settings](/developer/plugin/configuration)

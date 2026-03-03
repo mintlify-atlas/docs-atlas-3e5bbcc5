@@ -1,0 +1,129 @@
+---
+title: Developer overview
+description: Introduction to Halo CMS development and architecture
+---
+
+Halo is a powerful and easy-to-use open-source website building tool built with modern technologies. This developer guide will help you understand Halo's architecture, set up your development environment, and start contributing to the project.
+
+## What is Halo?
+
+Halo is a content management system that combines a Spring Boot backend with a Vue.js frontend to provide a comprehensive solution for building websites and blogs. The project follows a modular architecture with support for plugins and themes.
+
+## Architecture overview
+
+Halo consists of several key components:
+
+- **Backend**: Built with Spring Boot and Java 21, providing RESTful APIs and plugin support
+- **Frontend**: Vue 3-based console application for content management
+- **Plugin System**: Extensible architecture allowing custom functionality
+- **Theme Engine**: Customizable theming system for site presentation
+
+## Technology stack
+
+### Backend
+
+- **Java 21**: Core programming language
+- **Spring Boot 3.x**: Application framework
+- **Gradle 9.3**: Build automation tool
+- **R2DBC**: Reactive database connectivity
+- **Spring Security**: Authentication and authorization
+
+### Frontend
+
+- **Vue 3**: Progressive JavaScript framework
+- **Vite**: Build tool and development server
+- **TypeScript**: Type-safe JavaScript
+- **Pinia**: State management
+- **FormKit**: Form handling
+- **TailwindCSS**: Utility-first CSS framework
+
+### Package management
+
+- **pnpm 10**: Fast, disk space efficient package manager for frontend
+- **Gradle Wrapper**: Ensures consistent Gradle version across environments
+
+## Project structure
+
+The Halo monorepo is organized into several modules:
+
+```
+halo/
+├── api/                    # API definitions and interfaces
+├── application/            # Main Spring Boot application
+├── platform/
+│   ├── application/       # Platform application components
+│   └── plugin/            # Plugin platform implementation
+├── ui/                    # Frontend console application
+│   ├── packages/          # Shared packages and libraries
+│   ├── src/              # Console source code
+│   └── vite.config.ts    # Vite configuration
+└── e2e/                   # End-to-end tests
+```
+
+## Development workflow
+
+When developing for Halo, you'll typically:
+
+1. **Clone the repository** with submodules
+2. **Set up the backend** with Java 21 and Gradle
+3. **Set up the frontend** with Node.js and pnpm
+4. **Run both servers** concurrently during development
+5. **Make changes** to backend or frontend code
+6. **Test your changes** with automated tests
+7. **Submit pull requests** following contribution guidelines
+
+## API documentation
+
+Halo provides comprehensive OpenAPI documentation for its RESTful APIs:
+
+- **Console API**: Administrative operations
+- **Public API**: Public-facing endpoints
+- **User Center API**: User management endpoints
+- **Extension API**: Plugin and extension APIs
+
+API documentation is automatically generated from the codebase and available when running the development server.
+
+## Plugin development
+
+Halo's plugin system allows you to extend functionality without modifying core code. Plugins can:
+
+- Add new custom resources and APIs
+- Extend the console UI with custom views
+- Hook into lifecycle events
+- Provide additional themes and templates
+
+## Contributing
+
+We welcome contributions to Halo! Before starting development:
+
+1. Check existing issues or create a new one to discuss your idea
+2. Fork the repository and create a feature branch
+3. Follow the code style guidelines
+4. Add tests for new functionality
+5. Submit a pull request for review
+
+Refer to the [CONTRIBUTING.md](https://github.com/halo-dev/halo/blob/main/CONTRIBUTING.md) file for detailed contribution guidelines.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Environment setup" icon="laptop-code" href="/developer/environment-setup">
+    Set up your local development environment
+  </Card>
+  <Card title="Extension system" icon="code" href="/developer/extension/overview">
+    Learn about Halo's extension framework
+  </Card>
+  <Card title="Plugin development" icon="puzzle-piece" href="/developer/plugin/basics">
+    Create your first Halo plugin
+  </Card>
+  <Card title="API reference" icon="book" href="/api/overview">
+    Explore the API documentation
+  </Card>
+</CardGroup>
+
+## Resources
+
+- [Official Website](https://www.halo.run)
+- [GitHub Repository](https://github.com/halo-dev/halo)
+- [Community Forum](https://bbs.halo.run)
+- [Documentation](https://docs.halo.run)

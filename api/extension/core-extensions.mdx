@@ -1,0 +1,652 @@
+---
+title: Core Extensions
+description: API reference for Halo's built-in core extension types and their REST endpoints
+---
+
+Halo's Extension API provides a unified REST interface for managing all extension resources. Core extensions are built-in resource types that represent the fundamental entities in Halo CMS.
+
+## Overview
+
+Core extensions follow a Kubernetes-inspired design pattern with:
+
+- **Group-Version-Kind (GVK)** based routing
+- **Standard CRUD operations** (Create, Read, Update, Delete, List)
+- **Metadata management** including labels, annotations, and versioning
+- **Optimistic locking** through version numbers
+- **Soft deletion** with finalizers support
+
+## API Endpoints
+
+All extension APIs follow a consistent URL pattern:
+
+```
+/api/{version}/{plural}              # List and Create
+/api/{version}/{plural}/{name}       # Get, Update, Delete
+/apis/{group}/{version}/{plural}     # List and Create (grouped extensions)
+/apis/{group}/{version}/{plural}/{name} # Get, Update, Delete (grouped extensions)
+```
+
+## Authentication
+
+All Extension APIs require authentication using one of the following methods:
+
+- **Basic Auth**: Username and password credentials
+- **Bearer Token**: JWT token obtained from login
+
+See the [Authentication guide](/api/authentication) for details.
+
+## Core Extension Types
+
+### Content Extensions
+
+Content extensions are in the `content.halo.run` group.
+
+#### Post
+
+**GVK**: `content.halo.run/v1alpha1/Post`
+
+Represents a blog post with full content management capabilities.
+
+<ParamField path="spec.title" type="string" required>
+  Post title
+</ParamField>
+
+<ParamField path="spec.slug" type="string" required>
+  URL-friendly identifier
+</ParamField>
+
+<ParamField path="spec.owner" type="string">
+  Username of the post owner
+</ParamField>
+
+<ParamField path="spec.deleted" type="boolean" default="false">
+  Whether the post is in recycle bin
+</ParamField>
+
+<ParamField path="spec.publish" type="boolean" default="false">
+  Whether to publish the post
+</ParamField>
+
+<ParamField path="spec.publishTime" type="string">
+  ISO 8601 timestamp for scheduled publishing
+</ParamField>
+
+<ParamField path="spec.pinned" type="boolean" default="false">
+  Pin post to top of list
+</ParamField>
+
+<ParamField path="spec.allowComment" type="boolean" default="true">
+  Allow comments on this post
+</ParamField>
+
+<ParamField path="spec.visible" type="string" default="PUBLIC">
+  Visibility level: `PUBLIC`, `INTERNAL`, or `PRIVATE`
+</ParamField>
+
+<ParamField path="spec.categories" type="array">
+  Array of category names
+</ParamField>
+
+<ParamField path="spec.tags" type="array">
+  Array of tag names
+</ParamField>
+
+<ResponseField name="status.phase" type="string">
+  Current phase: `DRAFT`, `PENDING_APPROVAL`, `PUBLISHED`, or `FAILED`
+</ResponseField>
+
+<ResponseField name="status.permalink" type="string">
+  Public URL of the published post
+</ResponseField>
+
+<ResponseField name="status.excerpt" type="string">
+  Auto-generated or custom excerpt
+</ResponseField>
+
+**Example: List Posts**
+
+```bash
+curl -X GET 'http://localhost:8091/apis/content.halo.run/v1alpha1/posts?page=0&size=20' \
+  -H 'Authorization: Bearer <token>'
+```
+
+**Example: Create Post**
+
+```bash
+curl -X POST 'http://localhost:8091/apis/content.halo.run/v1alpha1/posts' \
+  -H 'Authorization: Bearer <token>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "apiVersion": "content.halo.run/v1alpha1",
+    "kind": "Post",
+    "metadata": {
+      "name": "my-first-post"
+    },
+    "spec": {
+      "title": "My First Post",
+      "slug": "my-first-post",
+      "deleted": false,
+      "publish": false,
+      "pinned": false,
+      "allowComment": true,
+      "visible": "PUBLIC",
+      "priority": 0,
+      "excerpt": {
+        "autoGenerate": true
+      }
+    }
+  }'
+```
+
+#### SinglePage
+
+**GVK**: `content.halo.run/v1alpha1/SinglePage`
+
+Represents a standalone page (not part of the blog stream).
+
+<ParamField path="spec.title" type="string" required>
+  Page title
+</ParamField>
+
+<ParamField path="spec.slug" type="string" required>
+  URL-friendly identifier
+</ParamField>
+
+<ParamField path="spec.deleted" type="boolean" default="false">
+  Whether the page is in recycle bin
+</ParamField>
+
+<ParamField path="spec.publish" type="boolean" default="false">
+  Whether to publish the page
+</ParamField>
+
+<ParamField path="spec.visible" type="string" default="PUBLIC">
+  Visibility level: `PUBLIC`, `INTERNAL`, or `PRIVATE`
+</ParamField>
+
+**Example: Get Single Page**
+
+```bash
+curl -X GET 'http://localhost:8091/apis/content.halo.run/v1alpha1/singlepages/about' \
+  -H 'Authorization: Bearer <token>'
+```
+
+#### Category
+
+**GVK**: `content.halo.run/v1alpha1/Category`
+
+Represents a post category with hierarchical support.
+
+<ParamField path="spec.displayName" type="string" required>
+  Display name of the category
+</ParamField>
+
+<ParamField path="spec.slug" type="string" required>
+  URL-friendly identifier
+</ParamField>
+
+<ParamField path="spec.description" type="string">
+  Category description
+</ParamField>
+
+<ParamField path="spec.priority" type="integer" default="0">
+  Sort priority (higher values first)
+</ParamField>
+
+<ParamField path="spec.children" type="array">
+  Array of child category names for hierarchical structure
+</ParamField>
+
+<ResponseField name="status.postCount" type="integer">
+  Total number of posts including subcategories
+</ResponseField>
+
+<ResponseField name="status.visiblePostCount" type="integer">
+  Number of published and public posts
+</ResponseField>
+
+#### Tag
+
+**GVK**: `content.halo.run/v1alpha1/Tag`
+
+Represents a post tag.
+
+<ParamField path="spec.displayName" type="string" required>
+  Display name of the tag
+</ParamField>
+
+<ParamField path="spec.slug" type="string" required>
+  URL-friendly identifier
+</ParamField>
+
+<ParamField path="spec.color" type="string">
+  Color code for the tag (e.g., `#FF5733`)
+</ParamField>
+
+#### Comment
+
+**GVK**: `content.halo.run/v1alpha1/Comment`
+
+Represents a comment on a post or page.
+
+<ParamField path="spec.raw" type="string" required>
+  Raw comment content (Markdown)
+</ParamField>
+
+<ParamField path="spec.content" type="string" required>
+  Rendered HTML content
+</ParamField>
+
+<ParamField path="spec.owner" type="object" required>
+  Comment owner information with `kind`, `name`, and `displayName`
+</ParamField>
+
+<ParamField path="spec.approved" type="boolean" default="false">
+  Whether the comment is approved
+</ParamField>
+
+<ParamField path="spec.hidden" type="boolean" default="false">
+  Whether the comment is hidden
+</ParamField>
+
+<ParamField path="spec.subjectRef" type="object" required>
+  Reference to the subject (Post/SinglePage) with `group`, `version`, `kind`, and `name`
+</ParamField>
+
+### Core Extensions (v1alpha1)
+
+These extensions use the default API group (empty string).
+
+#### User
+
+**GVK**: `v1alpha1/User`
+
+Represents a user account.
+
+<ParamField path="spec.displayName" type="string" required>
+  User's display name
+</ParamField>
+
+<ParamField path="spec.email" type="string" required>
+  User's email address
+</ParamField>
+
+<ParamField path="spec.avatar" type="string">
+  Avatar image URL
+</ParamField>
+
+<ParamField path="spec.bio" type="string">
+  User biography
+</ParamField>
+
+<ParamField path="spec.disabled" type="boolean">
+  Whether the account is disabled
+</ParamField>
+
+**Example: List Users**
+
+```bash
+curl -X GET 'http://localhost:8091/api/v1alpha1/users' \
+  -H 'Authorization: Bearer <token>'
+```
+
+#### Role
+
+**GVK**: `v1alpha1/Role`
+
+Defines permissions and access control.
+
+<ParamField path="rules" type="array" required>
+  Array of policy rules defining permissions
+</ParamField>
+
+#### RoleBinding
+
+**GVK**: `v1alpha1/RoleBinding`
+
+Binds roles to users or groups.
+
+<ParamField path="subjects" type="array" required>
+  Array of subjects (users/groups) to bind
+</ParamField>
+
+<ParamField path="roleRef" type="object" required>
+  Reference to the role being bound
+</ParamField>
+
+#### Setting
+
+**GVK**: `v1alpha1/Setting`
+
+Stores system or plugin configuration settings.
+
+<ParamField path="spec.forms" type="array">
+  Form configuration for setting UI
+</ParamField>
+
+#### ConfigMap
+
+**GVK**: `v1alpha1/ConfigMap`
+
+Stores configuration data as key-value pairs.
+
+<ParamField path="data" type="object">
+  Key-value pairs of configuration data
+</ParamField>
+
+**Example: Get ConfigMap**
+
+```bash
+curl -X GET 'http://localhost:8091/api/v1alpha1/configmaps/system-config' \
+  -H 'Authorization: Bearer <token>'
+```
+
+#### Secret
+
+**GVK**: `v1alpha1/Secret`
+
+Stores sensitive data like passwords and tokens.
+
+<ParamField path="stringData" type="object">
+  Key-value pairs of secret data (write-only)
+</ParamField>
+
+<ResponseField name="data" type="object">
+  Base64-encoded secret data (read-only)
+</ResponseField>
+
+#### Menu
+
+**GVK**: `v1alpha1/Menu`
+
+Defines a navigation menu.
+
+<ParamField path="spec.displayName" type="string" required>
+  Menu display name
+</ParamField>
+
+#### MenuItem
+
+**GVK**: `v1alpha1/MenuItem`
+
+Represents an item in a menu.
+
+<ParamField path="spec.displayName" type="string" required>
+  Display text for the menu item
+</ParamField>
+
+<ParamField path="spec.href" type="string">
+  Link URL
+</ParamField>
+
+<ParamField path="spec.children" type="array">
+  Array of child menu item names
+</ParamField>
+
+### Plugin Extensions
+
+#### Plugin
+
+**GVK**: `plugin.halo.run/v1alpha1/Plugin`
+
+Represents an installed plugin.
+
+<ParamField path="spec.displayName" type="string">
+  Plugin display name
+</ParamField>
+
+<ParamField path="spec.version" type="string" required>
+  Plugin version (semantic versioning)
+</ParamField>
+
+<ParamField path="spec.enabled" type="boolean" default="false">
+  Whether the plugin is enabled
+</ParamField>
+
+<ParamField path="spec.author" type="object">
+  Plugin author information with `name` and `website`
+</ParamField>
+
+<ParamField path="spec.homepage" type="string">
+  Plugin homepage URL
+</ParamField>
+
+<ResponseField name="status.phase" type="string">
+  Plugin phase: `PENDING`, `STARTING`, `STARTED`, `STOPPED`, `FAILED`, etc.
+</ResponseField>
+
+<ResponseField name="status.loadLocation" type="string">
+  File system path where the plugin is loaded from
+</ResponseField>
+
+**Example: Update Plugin**
+
+```bash
+curl -X PUT 'http://localhost:8091/apis/plugin.halo.run/v1alpha1/plugins/my-plugin' \
+  -H 'Authorization: Bearer <token>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "apiVersion": "plugin.halo.run/v1alpha1",
+    "kind": "Plugin",
+    "metadata": {
+      "name": "my-plugin",
+      "version": 1
+    },
+    "spec": {
+      "enabled": true,
+      "version": "1.0.0"
+    }
+  }'
+```
+
+### Theme Extensions
+
+#### Theme
+
+**GVK**: `theme.halo.run/v1alpha1/Theme`
+
+Represents an installed theme.
+
+<ParamField path="spec.displayName" type="string" required>
+  Theme display name
+</ParamField>
+
+<ParamField path="spec.version" type="string">
+  Theme version
+</ParamField>
+
+<ParamField path="spec.author" type="object" required>
+  Theme author with `name` and optional `website`
+</ParamField>
+
+<ParamField path="spec.customTemplates" type="object">
+  Custom template definitions for posts, pages, and categories
+</ParamField>
+
+<ResponseField name="status.phase" type="string">
+  Theme phase: `READY`, `FAILED`, or `UNKNOWN`
+</ResponseField>
+
+## Common Operations
+
+### List Extensions
+
+List all resources of a given type with pagination, filtering, and sorting.
+
+<ParamField query="page" type="integer" default="0">
+  Page number (0-based)
+</ParamField>
+
+<ParamField query="size" type="integer" default="0">
+  Page size (0 means no pagination)
+</ParamField>
+
+<ParamField query="labelSelector" type="array">
+  Filter by labels (e.g., `hidden!=true`)
+</ParamField>
+
+<ParamField query="fieldSelector" type="array">
+  Filter by fields (e.g., `metadata.name==my-post`)
+</ParamField>
+
+<ParamField query="sort" type="array">
+  Sort criteria (e.g., `metadata.creationTimestamp,desc`)
+</ParamField>
+
+**Example: List with Filters**
+
+```bash
+curl -X GET 'http://localhost:8091/apis/content.halo.run/v1alpha1/posts?labelSelector=content.halo.run/published=true&sort=metadata.creationTimestamp,desc&page=0&size=10' \
+  -H 'Authorization: Bearer <token>'
+```
+
+### Get Extension
+
+Retrieve a single resource by name.
+
+```bash
+GET /api/v1alpha1/{plural}/{name}
+GET /apis/{group}/{version}/{plural}/{name}
+```
+
+### Create Extension
+
+Create a new resource.
+
+```bash
+POST /api/v1alpha1/{plural}
+POST /apis/{group}/{version}/{plural}
+Content-Type: application/json
+```
+
+The request body must include `apiVersion`, `kind`, `metadata`, and `spec`.
+
+### Update Extension
+
+Update an existing resource (full replacement).
+
+```bash
+PUT /api/v1alpha1/{plural}/{name}
+PUT /apis/{group}/{version}/{plural}/{name}
+Content-Type: application/json
+```
+
+<Warning>
+The `metadata.version` field is required and must match the current version to prevent concurrent update conflicts.
+</Warning>
+
+### Patch Extension
+
+Partially update a resource using JSON Patch (RFC 6902).
+
+```bash
+PATCH /api/v1alpha1/{plural}/{name}
+PATCH /apis/{group}/{version}/{plural}/{name}
+Content-Type: application/json-patch+json
+```
+
+**Example: Patch Post**
+
+```bash
+curl -X PATCH 'http://localhost:8091/apis/content.halo.run/v1alpha1/posts/my-post' \
+  -H 'Authorization: Bearer <token>' \
+  -H 'Content-Type: application/json-patch+json' \
+  -d '[
+    {
+      "op": "replace",
+      "path": "/spec/title",
+      "value": "Updated Title"
+    }
+  ]'
+```
+
+### Delete Extension
+
+Delete a resource.
+
+```bash
+DELETE /api/v1alpha1/{plural}/{name}
+DELETE /apis/{group}/{version}/{plural}/{name}
+```
+
+<Info>
+Resources with finalizers are soft-deleted (marked with `deletionTimestamp`) until all finalizers are removed.
+</Info>
+
+## Response Format
+
+All responses follow a consistent structure:
+
+### Single Resource Response
+
+```json
+{
+  "apiVersion": "content.halo.run/v1alpha1",
+  "kind": "Post",
+  "metadata": {
+    "name": "my-post",
+    "version": 5,
+    "creationTimestamp": "2024-01-15T10:30:00Z",
+    "labels": {
+      "content.halo.run/published": "true"
+    }
+  },
+  "spec": {
+    "title": "My Post",
+    "slug": "my-post",
+    "publish": true
+  },
+  "status": {
+    "phase": "PUBLISHED",
+    "permalink": "https://example.com/posts/my-post"
+  }
+}
+```
+
+### List Response
+
+```json
+{
+  "page": 1,
+  "size": 20,
+  "total": 42,
+  "totalPages": 3,
+  "first": true,
+  "last": false,
+  "hasNext": true,
+  "hasPrevious": false,
+  "items": [
+    { /* extension object */ },
+    { /* extension object */ }
+  ]
+}
+```
+
+## Error Handling
+
+API errors return appropriate HTTP status codes with error details:
+
+- **400 Bad Request**: Invalid request body or parameters
+- **401 Unauthorized**: Missing or invalid authentication
+- **403 Forbidden**: Insufficient permissions
+- **404 Not Found**: Resource not found
+- **409 Conflict**: Version conflict (optimistic locking failure)
+- **422 Unprocessable Entity**: Validation error
+- **500 Internal Server Error**: Server error
+
+**Error Response:**
+
+```json
+{
+  "status": 409,
+  "error": "Conflict",
+  "message": "The resource version has been modified",
+  "path": "/apis/content.halo.run/v1alpha1/posts/my-post"
+}
+```
+
+## Next Steps
+
+- [Custom Extensions](/api/extension/custom-extensions) - Learn how to create and manage custom extension types
+- [Authentication](/api/authentication) - Authentication and authorization details
+- [Extension System Overview](/developer/extension/overview) - Deep dive into the extension system architecture

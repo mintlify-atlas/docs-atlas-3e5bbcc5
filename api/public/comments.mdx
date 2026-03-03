@@ -1,0 +1,385 @@
+---
+title: Comments API
+description: Public API endpoints for managing and retrieving comments and replies
+---
+
+The Comments API provides endpoints to list, create, and manage comments and replies on posts and pages.
+
+## List Comments
+
+Retrieves a paginated list of comments for a specific subject (post, page, etc.).
+
+<CodeGroup>
+```bash cURL
+curl -X GET "http://localhost:8091/apis/api.halo.run/v1alpha1/comments?kind=Post&version=v1alpha1&name=post-name&page=0&size=10" \
+  -H "Accept: application/json"
+```
+</CodeGroup>
+
+### Query Parameters
+
+<ParamField query="kind" type="string" required>
+  The comment subject kind (e.g., `Post`, `SinglePage`).
+</ParamField>
+
+<ParamField query="version" type="string" required>
+  The comment subject version (e.g., `v1alpha1`).
+</ParamField>
+
+<ParamField query="name" type="string" required>
+  The comment subject name.
+</ParamField>
+
+<ParamField query="group" type="string">
+  The comment subject group.
+</ParamField>
+
+<ParamField query="page" type="integer" default="0">
+  Page number. Default is 0.
+</ParamField>
+
+<ParamField query="size" type="integer" default="0">
+  Size number. Default is 0.
+</ParamField>
+
+<ParamField query="sort" type="array">
+  Sorting criteria in the format: `property,(asc|desc)`. Default sort order is ascending. Multiple sort criteria are supported.
+</ParamField>
+
+<ParamField query="withReplies" type="boolean" default="false">
+  Whether to include replies. Default is false.
+</ParamField>
+
+<ParamField query="replySize" type="integer" default="10">
+  Reply size of the comment. Only works when `withReplies` is true.
+</ParamField>
+
+### Response
+
+Returns a `CommentWithReplyVoList` object containing paginated comment results.
+
+<ResponseField name="items" type="array">
+  Array of comment objects with replies.
+  
+  <ResponseField name="metadata" type="Metadata" required>
+    Comment metadata including name, labels, and timestamps.
+  </ResponseField>
+  
+  <ResponseField name="spec" type="CommentSpec" required>
+    Comment specification.
+    
+    <ResponseField name="raw" type="string" required>
+      Raw comment content.
+    </ResponseField>
+    
+    <ResponseField name="content" type="string" required>
+      Rendered comment content.
+    </ResponseField>
+    
+    <ResponseField name="owner" type="CommentOwner" required>
+      Comment owner information.
+    </ResponseField>
+    
+    <ResponseField name="approved" type="boolean" default="false">
+      Whether the comment is approved.
+    </ResponseField>
+    
+    <ResponseField name="hidden" type="boolean" default="false">
+      Whether the comment is hidden.
+    </ResponseField>
+    
+    <ResponseField name="allowNotification" type="boolean" default="true">
+      Whether notifications are allowed.
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="owner" type="OwnerInfo" required>
+    Comment owner details.
+    
+    <ResponseField name="kind" type="string">
+      Owner kind (e.g., `User`, `Email`).
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Owner name.
+    </ResponseField>
+    
+    <ResponseField name="displayName" type="string">
+      Owner display name.
+    </ResponseField>
+    
+    <ResponseField name="avatar" type="string">
+      Owner avatar URL.
+    </ResponseField>
+    
+    <ResponseField name="email" type="string">
+      Owner email address.
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="stats" type="CommentStatsVo" required>
+    Comment statistics.
+    
+    <ResponseField name="upvote" type="integer">
+      Number of upvotes.
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="status" type="CommentStatus">
+    Comment status information.
+    
+    <ResponseField name="replyCount" type="integer">
+      Total number of replies.
+    </ResponseField>
+    
+    <ResponseField name="visibleReplyCount" type="integer">
+      Number of visible replies.
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="replies" type="ListResultReplyVo">
+    Paginated list of replies (when `withReplies` is true).
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="page" type="integer">
+  Current page number, starts from 1.
+</ResponseField>
+
+<ResponseField name="size" type="integer">
+  Size of each page.
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of comments.
+</ResponseField>
+
+<ResponseField name="totalPages" type="integer">
+  Total number of pages.
+</ResponseField>
+
+<ResponseField name="first" type="boolean">
+  Whether this is the first page.
+</ResponseField>
+
+<ResponseField name="last" type="boolean">
+  Whether this is the last page.
+</ResponseField>
+
+<ResponseField name="hasNext" type="boolean">
+  Whether there is a next page.
+</ResponseField>
+
+<ResponseField name="hasPrevious" type="boolean">
+  Whether there is a previous page.
+</ResponseField>
+
+## Create Comment
+
+Creates a new comment on a post or page.
+
+<CodeGroup>
+```bash cURL
+curl -X POST "http://localhost:8091/apis/api.halo.run/v1alpha1/comments" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{
+    "subjectRef": {
+      "group": "content.halo.run",
+      "version": "v1alpha1",
+      "kind": "Post",
+      "name": "post-name"
+    },
+    "raw": "This is a comment",
+    "content": "<p>This is a comment</p>",
+    "allowNotification": true
+  }'
+```
+</CodeGroup>
+
+### Request Body
+
+<ParamField body="subjectRef" type="Ref" required>
+  Reference to the subject (post, page, etc.) being commented on.
+  
+  <ParamField body="group" type="string" required>
+    Extension group (e.g., `content.halo.run`).
+  </ParamField>
+  
+  <ParamField body="version" type="string">
+    Extension version.
+  </ParamField>
+  
+  <ParamField body="kind" type="string" required>
+    Extension kind (e.g., `Post`, `SinglePage`).
+  </ParamField>
+  
+  <ParamField body="name" type="string" required>
+    Extension name.
+  </ParamField>
+</ParamField>
+
+<ParamField body="raw" type="string" required>
+  Raw comment content (markdown/plain text).
+</ParamField>
+
+<ParamField body="content" type="string" required>
+  Rendered comment content (HTML).
+</ParamField>
+
+<ParamField body="allowNotification" type="boolean" default="false">
+  Whether to allow notifications for this comment.
+</ParamField>
+
+<ParamField body="hidden" type="boolean" default="false">
+  Whether the comment should be hidden.
+</ParamField>
+
+<ParamField body="owner" type="CommentEmailOwner">
+  Comment owner information (for non-logged-in users).
+  
+  <ParamField body="displayName" type="string">
+    Display name.
+  </ParamField>
+  
+  <ParamField body="email" type="string">
+    Email address.
+  </ParamField>
+  
+  <ParamField body="website" type="string">
+    Website URL.
+  </ParamField>
+  
+  <ParamField body="avatar" type="string">
+    Avatar URL.
+  </ParamField>
+</ParamField>
+
+### Response
+
+Returns a `Comment` object representing the created comment.
+
+## Get Comment
+
+Retrieves a specific comment by name.
+
+<CodeGroup>
+```bash cURL
+curl -X GET "http://localhost:8091/apis/api.halo.run/v1alpha1/comments/{name}" \
+  -H "Accept: application/json"
+```
+</CodeGroup>
+
+### Path Parameters
+
+<ParamField path="name" type="string" required>
+  Comment name (unique identifier).
+</ParamField>
+
+### Response
+
+Returns a `CommentVoList` object.
+
+## List Comment Replies
+
+Retrieves all replies for a specific comment.
+
+<CodeGroup>
+```bash cURL
+curl -X GET "http://localhost:8091/apis/api.halo.run/v1alpha1/comments/{name}/reply?page=0&size=10" \
+  -H "Accept: application/json"
+```
+</CodeGroup>
+
+### Path Parameters
+
+<ParamField path="name" type="string" required>
+  Comment name (unique identifier).
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="page" type="integer" default="0">
+  Page number. Default is 0.
+</ParamField>
+
+<ParamField query="size" type="integer" default="0">
+  Size number. Default is 0.
+</ParamField>
+
+### Response
+
+Returns a `ReplyVoList` object containing paginated reply results.
+
+<ResponseField name="items" type="array">
+  Array of reply objects.
+  
+  <ResponseField name="metadata" type="Metadata" required>
+    Reply metadata.
+  </ResponseField>
+  
+  <ResponseField name="spec" type="ReplySpec" required>
+    Reply specification.
+  </ResponseField>
+  
+  <ResponseField name="owner" type="OwnerInfo" required>
+    Reply owner information.
+  </ResponseField>
+  
+  <ResponseField name="stats" type="CommentStatsVo" required>
+    Reply statistics.
+  </ResponseField>
+</ResponseField>
+
+## Create Reply
+
+Creates a new reply to a comment.
+
+<CodeGroup>
+```bash cURL
+curl -X POST "http://localhost:8091/apis/api.halo.run/v1alpha1/comments/{name}/reply" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{
+    "raw": "This is a reply",
+    "content": "<p>This is a reply</p>",
+    "allowNotification": true
+  }'
+```
+</CodeGroup>
+
+### Path Parameters
+
+<ParamField path="name" type="string" required>
+  Comment name (unique identifier) to reply to.
+</ParamField>
+
+### Request Body
+
+<ParamField body="raw" type="string" required>
+  Raw reply content (markdown/plain text).
+</ParamField>
+
+<ParamField body="content" type="string" required>
+  Rendered reply content (HTML).
+</ParamField>
+
+<ParamField body="allowNotification" type="boolean" default="false">
+  Whether to allow notifications for this reply.
+</ParamField>
+
+<ParamField body="hidden" type="boolean" default="false">
+  Whether the reply should be hidden.
+</ParamField>
+
+<ParamField body="quoteReply" type="string">
+  Name of the reply being quoted.
+</ParamField>
+
+<ParamField body="owner" type="CommentEmailOwner">
+  Reply owner information (for non-logged-in users).
+</ParamField>
+
+### Response
+
+Returns a `Reply` object representing the created reply.

@@ -1,0 +1,516 @@
+---
+title: Content Management APIs
+description: Manage posts, pages, comments, attachments and other content in Halo CMS
+---
+
+The Content Management APIs allow you to create, read, update and delete various content types in Halo CMS including posts, single pages, comments, replies, tags and attachments.
+
+## Posts
+
+### List Posts
+
+Retrieve a paginated list of posts with optional filtering.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/posts?page=0&size=20" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField query="page" type="integer" default="0">
+  Page number. Default is 0.
+</ParamField>
+
+<ParamField query="size" type="integer" default="0">
+  Size number. Default is 0.
+</ParamField>
+
+<ParamField query="publishPhase" type="string">
+  Posts filtered by publish phase. Values: `DRAFT`, `PENDING_APPROVAL`, `PUBLISHED`, `FAILED`
+</ParamField>
+
+<ParamField query="keyword" type="string">
+  Posts filtered by keyword.
+</ParamField>
+
+<ParamField query="categoryWithChildren" type="string">
+  Posts filtered by category including sub-categories.
+</ParamField>
+
+<ParamField query="labelSelector" type="array">
+  Label selector. e.g.: hidden!=true
+</ParamField>
+
+<ParamField query="fieldSelector" type="array">
+  Field selector. e.g.: metadata.name==halo
+</ParamField>
+
+<ParamField query="sort" type="array">
+  Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.
+</ParamField>
+
+<ResponseField name="items" type="array">
+  Array of post objects
+</ResponseField>
+
+<ResponseField name="page" type="integer">
+  Current page number
+</ResponseField>
+
+<ResponseField name="size" type="integer">
+  Size of each page
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of posts
+</ResponseField>
+
+<ResponseField name="totalPages" type="integer">
+  Total number of pages
+</ResponseField>
+
+### Create Draft Post
+
+Create a new draft post.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/posts" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "post": {
+      "spec": {
+        "title": "My New Post",
+        "slug": "my-new-post",
+        "categories": ["category-1"],
+        "tags": ["tag-1", "tag-2"]
+      }
+    },
+    "content": {
+      "raw": "# Hello World\n\nThis is my post content.",
+      "content": "<h1>Hello World</h1><p>This is my post content.</p>",
+      "rawType": "markdown"
+    }
+  }'
+```
+
+<ResponseField name="post" type="object">
+  The created post object
+</ResponseField>
+
+### Update Post
+
+Update an existing post.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/posts/{name}" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "post": {
+      "spec": {
+        "title": "Updated Post Title"
+      }
+    },
+    "content": {
+      "raw": "Updated content",
+      "content": "<p>Updated content</p>",
+      "rawType": "markdown"
+    }
+  }'
+```
+
+<ParamField path="name" type="string" required>
+  Post name/identifier
+</ParamField>
+
+### Publish Post
+
+Publish a draft post.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/posts/{name}/publish" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  Post name to publish
+</ParamField>
+
+<ParamField query="headSnapshot" type="string">
+  Head snapshot name of content
+</ParamField>
+
+<ParamField query="async" type="boolean">
+  Whether to publish asynchronously
+</ParamField>
+
+### Unpublish Post
+
+Unpublish a published post.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/posts/{name}/unpublish" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  Post name to unpublish
+</ParamField>
+
+### Recycle Post
+
+Move a post to recycle bin.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/posts/{name}/recycle" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  Post name to recycle
+</ParamField>
+
+### Fetch Post Content
+
+Retrieve the content of a post.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/posts/{name}/content?snapshotName={snapshotName}" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  Post name
+</ParamField>
+
+<ParamField query="snapshotName" type="string" required>
+  Snapshot name of the content version
+</ParamField>
+
+### Update Post Content
+
+Update the content of a post.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/posts/{name}/content" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "raw": "# Updated Content",
+    "content": "<h1>Updated Content</h1>",
+    "rawType": "markdown"
+  }'
+```
+
+<ParamField path="name" type="string" required>
+  Post name
+</ParamField>
+
+## Single Pages
+
+### List Single Pages
+
+Retrieve a paginated list of single pages.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/singlepages?page=0&size=20" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField query="page" type="integer" default="0">
+  Page number
+</ParamField>
+
+<ParamField query="size" type="integer" default="0">
+  Size of each page
+</ParamField>
+
+<ParamField query="publishPhase" type="string">
+  Filter by publish phase: `DRAFT`, `PENDING_APPROVAL`, `PUBLISHED`, `FAILED`
+</ParamField>
+
+<ParamField query="visible" type="string">
+  Filter by visibility: `PUBLIC`, `INTERNAL`, `PRIVATE`
+</ParamField>
+
+<ParamField query="keyword" type="string">
+  Filter by keyword
+</ParamField>
+
+<ParamField query="contributor" type="array">
+  Filter by contributor names
+</ParamField>
+
+### Create Single Page
+
+Create a new single page.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/singlepages" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "page": {
+      "spec": {
+        "title": "About Page",
+        "slug": "about"
+      }
+    },
+    "content": {
+      "raw": "# About Us",
+      "content": "<h1>About Us</h1>",
+      "rawType": "markdown"
+    }
+  }'
+```
+
+### Update Single Page
+
+Update an existing single page.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/singlepages/{name}" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "page": {
+      "spec": {
+        "title": "Updated About Page"
+      }
+    },
+    "content": {
+      "raw": "Updated content",
+      "content": "<p>Updated content</p>",
+      "rawType": "markdown"
+    }
+  }'
+```
+
+<ParamField path="name" type="string" required>
+  Single page name
+</ParamField>
+
+### Publish Single Page
+
+Publish a single page.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/singlepages/{name}/publish" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  Single page name to publish
+</ParamField>
+
+## Comments
+
+### List Comments
+
+Retrieve a paginated list of comments.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/comments?page=0&size=20" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField query="page" type="integer" default="0">
+  Page number
+</ParamField>
+
+<ParamField query="size" type="integer" default="0">
+  Size of each page
+</ParamField>
+
+<ParamField query="keyword" type="string">
+  Filter comments by keyword
+</ParamField>
+
+<ParamField query="ownerKind" type="string">
+  Filter by commenter kind
+</ParamField>
+
+<ParamField query="ownerName" type="string">
+  Filter by commenter name
+</ParamField>
+
+### Create Comment
+
+Create a new comment.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/comments" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subjectRef": {
+      "group": "content.halo.run",
+      "kind": "Post",
+      "name": "post-name"
+    },
+    "raw": "This is a comment",
+    "content": "<p>This is a comment</p>",
+    "allowNotification": true
+  }'
+```
+
+<ResponseField name="comment" type="object">
+  The created comment object
+</ResponseField>
+
+### Create Reply
+
+Create a reply to a comment.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/comments/{name}/reply" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "raw": "This is a reply",
+    "content": "<p>This is a reply</p>",
+    "allowNotification": true
+  }'
+```
+
+<ParamField path="name" type="string" required>
+  Comment name to reply to
+</ParamField>
+
+### List Replies
+
+List all replies for a comment.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/replies?commentName={commentName}" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField query="commentName" type="string" required>
+  Comment name to get replies for
+</ParamField>
+
+<ParamField query="page" type="integer" default="0">
+  Page number
+</ParamField>
+
+<ParamField query="size" type="integer" default="0">
+  Size of each page
+</ParamField>
+
+## Tags
+
+### List Tags
+
+Retrieve a paginated list of tags.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/tags?page=0&size=20" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField query="page" type="integer" default="0">
+  Page number
+</ParamField>
+
+<ParamField query="size" type="integer" default="0">
+  Size of each page
+</ParamField>
+
+<ParamField query="keyword" type="string">
+  Filter tags by keyword
+</ParamField>
+
+<ParamField query="labelSelector" type="array">
+  Label selector for filtering
+</ParamField>
+
+<ParamField query="fieldSelector" type="array">
+  Field selector for filtering
+</ParamField>
+
+<ParamField query="sort" type="array">
+  Sorting criteria
+</ParamField>
+
+## Attachments
+
+### Search Attachments
+
+Search and list attachments with filtering options.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/attachments?page=0&size=20" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField query="page" type="integer" default="0">
+  Page number
+</ParamField>
+
+<ParamField query="size" type="integer" default="0">
+  Size of each page
+</ParamField>
+
+<ParamField query="keyword" type="string">
+  Keyword for searching attachments
+</ParamField>
+
+<ParamField query="accepts" type="array">
+  Acceptable media types for filtering
+</ParamField>
+
+<ParamField query="ungrouped" type="boolean">
+  Filter attachments without group. This parameter will ignore group parameter.
+</ParamField>
+
+### Upload Attachment
+
+Upload a new attachment file.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/attachments/upload" \
+  -H "Authorization: Bearer {token}" \
+  -F "file=@/path/to/file.jpg" \
+  -F "policyName=default-policy" \
+  -F "groupName=images"
+```
+
+<ResponseField name="metadata.name" type="string">
+  Unique identifier for the attachment
+</ResponseField>
+
+<ResponseField name="spec.displayName" type="string">
+  Display name of the attachment
+</ResponseField>
+
+<ResponseField name="spec.size" type="integer">
+  Size of attachment in bytes
+</ResponseField>
+
+<ResponseField name="spec.mediaType" type="string">
+  MIME type of the attachment
+</ResponseField>
+
+<ResponseField name="status.permalink" type="string">
+  Public URL of the attachment
+</ResponseField>
+
+### Upload from URL
+
+Upload an attachment from an external URL.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/attachments/-/upload-from-url" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com/image.jpg",
+    "policyName": "default-policy",
+    "groupName": "images"
+  }'
+```
+
+<ResponseField name="attachment" type="object">
+  The created attachment object
+</ResponseField>

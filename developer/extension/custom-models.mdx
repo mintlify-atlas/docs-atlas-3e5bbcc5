@@ -1,0 +1,520 @@
+---
+title: Creating Custom Extension Models
+description: Learn how to define custom Extension models with proper structure, validation, and schema annotations
+---
+
+Custom Extension models allow you to define your own resource types in Halo. This guide shows you how to create well-structured, validated Extension models.
+
+## Basic Extension Structure
+
+A typical Extension follows this structure:
+
+```java
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import run.halo.app.extension.AbstractExtension;
+import run.halo.app.extension.GVK;
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Data
+@EqualsAndHashCode(callSuper = true)
+@GVK(
+    group = "example.halo.run",
+    version = "v1alpha1",
+    kind = "Article",
+    plural = "articles",
+    singular = "article"
+)
+public class Article extends AbstractExtension {
+    
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+    private ArticleSpec spec;
+    
+    private ArticleStatus status;
+}
+```
+
+### Defining the Spec
+
+The `spec` contains the desired state (user-provided configuration):
+
+```java
+import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Data
+public class ArticleSpec {
+    
+    @Schema(
+        requiredMode = Schema.RequiredMode.REQUIRED,
+        description = "Article title",
+        minLength = 1,
+        maxLength = 200
+    )
+    private String title;
+    
+    @Schema(
+        description = "Article content in markdown format"
+    )
+    private String content;
+    
+    @Schema(
+        description = "Article author",
+        requiredMode = Schema.RequiredMode.REQUIRED
+    )
+    private String author;
+    
+    @Schema(
+        description = "Publication status",
+        defaultValue = "DRAFT"
+    )
+    private PublicationStatus status = PublicationStatus.DRAFT;
+    
+    @Schema(
+        description = "Article tags"
+    )
+    private List<String> tags;
+    
+    @Schema(
+        description = "Featured image URL"
+    )
+    private String featuredImage;
+    
+    public enum PublicationStatus {
+        DRAFT,
+        PUBLISHED,
+        ARCHIVED
+    }
+}
+```
+
+### Defining the Status
+
+The `status` contains the observed state (system-managed information):
+
+```java
+import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.Instant;
+
+@Data
+public class ArticleStatus {
+    
+    @Schema(description = "Current phase of the article")
+    private Phase phase;
+    
+    @Schema(description = "List of conditions")
+    private ConditionList conditions;
+    
+    @Schema(description = "Publication timestamp")
+    private Instant publishedAt;
+    
+    @Schema(description = "View count")
+    private Long viewCount;
+    
+    @Schema(description = "Last modified timestamp")
+    private Instant lastModifiedAt;
+    
+    public enum Phase {
+        PENDING,
+        READY,
+        PUBLISHED,
+        FAILED
+    }
+}
+```
+
+## Schema Validation
+
+Use `@Schema` annotations to define validation rules and documentation:
+
+### Common Validation Attributes
+
+```java
+@Data
+public class ValidationExample {
+    
+    // Required field
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+    private String requiredField;
+    
+    // String length constraints
+    @Schema(minLength = 5, maxLength = 50)
+    private String boundedString;
+    
+    // Numeric constraints
+    @Schema(minimum = "0", maximum = "100")
+    private Integer percentage;
+    
+    // Pattern matching
+    @Schema(pattern = "^[a-z0-9-]+$")
+    private String slug;
+    
+    // Array constraints
+    @Schema(minItems = 1, maxItems = 10)
+    private List<String> items;
+    
+    // Default values
+    @Schema(defaultValue = "true")
+    private Boolean enabled = true;
+    
+    // Descriptions for documentation
+    @Schema(description = "User-friendly description of this field")
+    private String documentedField;
+    
+    // Format hints
+    @Schema(format = "uri")
+    private String url;
+    
+    @Schema(format = "email")
+    private String email;
+    
+    @Schema(format = "date-time")
+    private Instant timestamp;
+}
+```
+
+### Nested Object Validation
+
+```java
+@Data
+public class ArticleSpec {
+    
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+    private String title;
+    
+    @Schema(description = "Author information")
+    private AuthorInfo author;
+    
+    @Data
+    public static class AuthorInfo {
+        @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
+            description = "Author name"
+        )
+        private String name;
+        
+        @Schema(format = "email")
+        private String email;
+        
+        @Schema(format = "uri")
+        private String website;
+    }
+}
+```
+
+## Complete Example: Book Extension
+
+Here's a comprehensive example showing all concepts:
+
+```java
+package run.halo.app.extension.book;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import run.halo.app.extension.AbstractExtension;
+import run.halo.app.extension.GVK;
+import run.halo.app.infra.ConditionList;
+
+import java.time.Instant;
+import java.util.List;
+
+/**
+ * Book extension for managing books in Halo.
+ */
+@Data
+@EqualsAndHashCode(callSuper = true)
+@GVK(
+    group = "content.halo.run",
+    version = "v1alpha1",
+    kind = "Book",
+    plural = "books",
+    singular = "book"
+)
+public class Book extends AbstractExtension {
+    
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+    private BookSpec spec;
+    
+    private BookStatus status;
+    
+    @Data
+    public static class BookSpec {
+        
+        @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
+            description = "Book title",
+            minLength = 1,
+            maxLength = 500
+        )
+        private String title;
+        
+        @Schema(
+            description = "Book subtitle",
+            maxLength = 500
+        )
+        private String subtitle;
+        
+        @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
+            description = "Book authors",
+            minItems = 1
+        )
+        private List<String> authors;
+        
+        @Schema(
+            description = "ISBN number",
+            pattern = "^(97(8|9))?\\d{9}(\\d|X)$"
+        )
+        private String isbn;
+        
+        @Schema(
+            description = "Publication year",
+            minimum = "1000",
+            maximum = "9999"
+        )
+        private Integer publicationYear;
+        
+        @Schema(description = "Publisher name")
+        private String publisher;
+        
+        @Schema(
+            description = "Number of pages",
+            minimum = "1"
+        )
+        private Integer pages;
+        
+        @Schema(description = "Book description/summary")
+        private String description;
+        
+        @Schema(description = "Cover image URL", format = "uri")
+        private String coverImage;
+        
+        @Schema(description = "Book genres/categories")
+        private List<String> genres;
+        
+        @Schema(
+            description = "Book language code (ISO 639-1)",
+            pattern = "^[a-z]{2}$",
+            defaultValue = "en"
+        )
+        private String language = "en";
+        
+        @Schema(
+            description = "Publication status",
+            defaultValue = "DRAFT"
+        )
+        private Status status = Status.DRAFT;
+        
+        public enum Status {
+            DRAFT,
+            PUBLISHED,
+            ARCHIVED
+        }
+    }
+    
+    @Data
+    public static class BookStatus {
+        
+        @Schema(description = "Current phase")
+        private Phase phase;
+        
+        @Schema(description = "Conditions")
+        private ConditionList conditions;
+        
+        @Schema(description = "Number of times this book has been viewed")
+        private Long viewCount = 0L;
+        
+        @Schema(description = "Number of times this book has been borrowed")
+        private Long borrowCount = 0L;
+        
+        @Schema(description = "Current rating (0-5)")
+        private Double rating;
+        
+        @Schema(description = "Number of ratings")
+        private Long ratingCount = 0L;
+        
+        @Schema(description = "Publication timestamp")
+        private Instant publishedAt;
+        
+        @Schema(description = "Last update timestamp")
+        private Instant lastModifiedAt;
+        
+        public enum Phase {
+            PENDING,
+            READY,
+            PUBLISHED,
+            FAILED
+        }
+    }
+}
+```
+
+## Working with Custom Extensions
+
+### Creating a Book
+
+```java
+@Service
+public class BookService {
+    
+    private final ReactiveExtensionClient client;
+    
+    public BookService(ReactiveExtensionClient client) {
+        this.client = client;
+    }
+    
+    public Mono<Book> createBook(String name, String title, List<String> authors) {
+        var book = new Book();
+        
+        // Set metadata
+        var metadata = new Metadata();
+        metadata.setName(name);
+        metadata.setLabels(Map.of(
+            "content.halo.run/type", "book"
+        ));
+        book.setMetadata(metadata);
+        
+        // Set spec
+        var spec = new Book.BookSpec();
+        spec.setTitle(title);
+        spec.setAuthors(authors);
+        spec.setStatus(Book.BookSpec.Status.DRAFT);
+        book.setSpec(spec);
+        
+        // Initialize status
+        var status = new Book.BookStatus();
+        status.setPhase(Book.BookStatus.Phase.PENDING);
+        status.setViewCount(0L);
+        book.setStatus(status);
+        
+        return client.create(book);
+    }
+}
+```
+
+### Updating a Book
+
+```java
+public Mono<Book> publishBook(String name) {
+    return client.fetch(Book.class, name)
+        .flatMap(book -> {
+            // Update spec
+            book.getSpec().setStatus(Book.BookSpec.Status.PUBLISHED);
+            
+            // Update status
+            book.getStatus().setPhase(Book.BookStatus.Phase.PUBLISHED);
+            book.getStatus().setPublishedAt(Instant.now());
+            
+            return client.update(book);
+        });
+}
+```
+
+## Best Practices
+
+### 1. Use Clear Naming Conventions
+
+```java
+// Good: Descriptive, follows conventions
+@GVK(
+    group = "content.halo.run",      // Reverse DNS, categorized
+    version = "v1alpha1",             // Clear versioning
+    kind = "BlogPost",                // Singular, CamelCase
+    plural = "blogposts",             // Lowercase plural
+    singular = "blogpost"             // Lowercase singular
+)
+
+// Bad: Unclear, inconsistent
+@GVK(
+    group = "my-plugin",
+    version = "v1",
+    kind = "post",
+    plural = "post",
+    singular = "posts"
+)
+```
+
+### 2. Always Separate Spec and Status
+
+```java
+// Good: Clear separation
+public class Book extends AbstractExtension {
+    private BookSpec spec;      // User input
+    private BookStatus status;  // System state
+}
+
+// Bad: Mixed concerns
+public class Book extends AbstractExtension {
+    private String title;       // Spec field
+    private Long viewCount;     // Status field - confusing!
+}
+```
+
+### 3. Provide Comprehensive Schema Documentation
+
+```java
+// Good: Well-documented
+@Schema(
+    requiredMode = Schema.RequiredMode.REQUIRED,
+    description = "ISBN-13 number for the book",
+    pattern = "^97(8|9)\\d{10}$",
+    example = "9780134685991"
+)
+private String isbn;
+
+// Bad: No documentation
+private String isbn;
+```
+
+### 4. Use Enums for Fixed Values
+
+```java
+// Good: Type-safe enum
+public enum Status {
+    DRAFT,
+    PUBLISHED,
+    ARCHIVED
+}
+
+// Bad: String values (error-prone)
+private String status; // Could be "draft", "Draft", "DRAFT", etc.
+```
+
+### 5. Initialize Collections and Defaults
+
+```java
+@Data
+public class BookSpec {
+    // Good: Initialized
+    private List<String> tags = new ArrayList<>();
+    private Status status = Status.DRAFT;
+    
+    // Also good: Nullable when appropriate
+    private String subtitle; // Can be null
+}
+```
+
+<Warning>
+Never modify Extension classes after they're in production without proper versioning. Create a new version (e.g., `v1alpha2`) if you need to make breaking changes.
+</Warning>
+
+## Schema Generation
+
+Halo automatically generates OpenAPI schemas from your Extension classes. These schemas are used for:
+
+- **Validation**: Ensuring data integrity
+- **Documentation**: Auto-generated API docs
+- **Client generation**: Type-safe clients
+
+The schema is generated from:
+- Class structure (fields, types)
+- `@Schema` annotations
+- JavaBean validation annotations
+
+## Next Steps
+
+- [Indexing and Querying Extensions](/developer/extension/indexing)
+- [Writing Reconcilers](/developer/extension/reconciler)
+- [Extension System Overview](/developer/extension/overview)

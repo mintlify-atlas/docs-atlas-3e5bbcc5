@@ -1,0 +1,267 @@
+---
+title: Plugin Development Basics
+description: Learn the fundamentals of developing plugins for Halo CMS
+---
+
+Halo's plugin system is built on top of [PF4J](https://pf4j.org/), a powerful plugin framework for Java. Plugins allow you to extend Halo's functionality without modifying the core application.
+
+## What is a Plugin?
+
+A plugin is a standalone module that extends Halo's capabilities by:
+
+- Adding custom content types (Extensions)
+- Creating custom API endpoints
+- Handling events and implementing business logic
+- Providing UI components and static resources
+- Integrating with external services
+
+## Core Concepts
+
+### BasePlugin
+
+Every plugin must extend the `BasePlugin` class, which serves as the entry point for your plugin:
+
+```java
+package run.halo.app.plugin;
+
+import org.pf4j.Plugin;
+
+public class BasePlugin extends Plugin {
+    protected PluginContext context;
+
+    public BasePlugin(PluginContext pluginContext) {
+        this.context = pluginContext;
+    }
+}
+```
+
+### PluginContext
+
+The `PluginContext` provides information about your plugin and facilitates communication with the application:
+
+```java
+public class PluginContext {
+    private final String name;           // Plugin name
+    private final String configMapName;  // ConfigMap name for settings
+    private final String version;        // Plugin version
+    private final RuntimeMode runtimeMode; // development or deployment
+}
+```
+
+<Note>
+PF4J recommends using `PluginContext` instead of `PluginWrapper` for better encapsulation.
+</Note>
+
+## Plugin Metadata
+
+Plugins are defined using the `@GVK` annotation and YAML descriptors.
+
+### The @GVK Annotation
+
+Extensions and custom resources use the `@GVK` annotation to define their metadata:
+
+```java
+@GVK(
+    group = "plugin.halo.run",
+    version = "v1alpha1",
+    kind = "Plugin",
+    plural = "plugins",
+    singular = "plugin"
+)
+public class Plugin extends AbstractExtension {
+    // Plugin implementation
+}
+```
+
+**Parameters:**
+
+- `group`: The API group (e.g., `plugin.halo.run`, `my-plugin.example.com`)
+- `version`: API version (e.g., `v1alpha1`, `v1beta1`, `v1`)
+- `kind`: The resource type name (e.g., `Plugin`, `Post`, `Comment`)
+- `plural`: Plural form for API endpoints (e.g., `plugins`, `posts`)
+- `singular`: Singular form for display (e.g., `plugin`, `post`)
+
+### GroupVersionKind (GVK)
+
+The GVK uniquely identifies an Extension type:
+
+```java
+public record GroupVersionKind(String group, String version, String kind) {
+    // Creates a GVK from apiVersion and kind
+    public static GroupVersionKind fromAPIVersionAndKind(
+        String apiVersion, 
+        String kind
+    ) {
+        // apiVersion format: "group/version" or just "version"
+        var gv = GroupVersion.parseAPIVersion(apiVersion);
+        return new GroupVersionKind(gv.group(), gv.version(), kind);
+    }
+}
+```
+
+## Extension Interface
+
+The `Extension` interface is the foundation for all custom resources in Halo:
+
+```java
+public interface Extension extends ExtensionOperator, Comparable<Extension> {
+    // Extensions are comparable by metadata.name
+}
+```
+
+### AbstractExtension
+
+Most Extensions extend `AbstractExtension` for convenience:
+
+```java
+public abstract class AbstractExtension implements Extension {
+    private String apiVersion;  // e.g., "plugin.halo.run/v1alpha1"
+    private String kind;        // e.g., "Plugin"
+    private MetadataOperator metadata; // name, labels, annotations, etc.
+}
+```
+
+## Creating Your First Plugin
+
+<Steps>
+
+### Create a plugin class
+
+Extend `BasePlugin` to create your main plugin class:
+
+```java
+package com.example.myplugin;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import run.halo.app.plugin.BasePlugin;
+import run.halo.app.plugin.PluginContext;
+
+@Slf4j
+@Component
+public class MyPlugin extends BasePlugin {
+
+    public MyPlugin(PluginContext pluginContext) {
+        super(pluginContext);
+    }
+}
+```
+
+### Define the plugin descriptor
+
+Create `plugin.yaml` in your resources directory:
+
+```yaml
+apiVersion: plugin.halo.run/v1alpha1
+kind: Plugin
+metadata:
+  name: my-plugin
+spec:
+  version: 1.0.0
+  requires: ">=2.0.0"
+  author:
+    name: Your Name
+    website: https://example.com
+  logo: https://example.com/logo.png
+  homepage: https://github.com/yourusername/my-plugin
+  displayName: My Awesome Plugin
+  description: A plugin that does amazing things
+  license:
+    - name: MIT
+      url: https://opensource.org/licenses/MIT
+```
+
+### Add Spring components
+
+Use Spring's `@Component`, `@Service`, or `@Configuration` annotations:
+
+```java
+@Service
+public class MyService {
+    public void doSomething() {
+        // Your business logic
+    }
+}
+```
+
+### Use dependency injection
+
+Inject Halo services into your components:
+
+```java
+@Component
+public class MyComponent {
+    private final ExtensionClient client;
+
+    public MyComponent(ExtensionClient client) {
+        this.client = client;
+    }
+
+    public void listPlugins() {
+        var plugins = client.list(Plugin.class, null, null);
+        // Work with plugins
+    }
+}
+```
+
+</Steps>
+
+## Plugin Descriptor Fields
+
+The `plugin.yaml` file defines your plugin's metadata:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `apiVersion` | String | Yes | Always `plugin.halo.run/v1alpha1` |
+| `kind` | String | Yes | Always `Plugin` |
+| `metadata.name` | String | Yes | Unique plugin identifier |
+| `spec.version` | String | Yes | [Semantic version](https://semver.org/) |
+| `spec.requires` | String | No | Halo version requirement (default: `*`) |
+| `spec.author.name` | String | Yes | Author name |
+| `spec.author.website` | String | No | Author website |
+| `spec.logo` | String | No | Plugin logo URL |
+| `spec.homepage` | String | No | Plugin homepage |
+| `spec.repo` | String | No | Source repository URL |
+| `spec.displayName` | String | No | Display name for UI |
+| `spec.description` | String | No | Plugin description |
+| `spec.license` | Array | No | License information |
+| `spec.pluginDependencies` | Map | No | Other plugin dependencies |
+
+## Development vs Production
+
+The `PluginContext` provides the runtime mode:
+
+```java
+@Component
+public class MyPlugin extends BasePlugin {
+    
+    public MyPlugin(PluginContext context) {
+        super(context);
+        
+        if (context.getRuntimeMode().isDevelopment()) {
+            log.info("Running in development mode");
+        }
+    }
+}
+```
+
+## Best Practices
+
+<Tip>
+- Use semantic versioning for your plugin
+- Provide clear descriptions and documentation
+- Follow Spring Boot conventions for component organization
+- Use constructor injection instead of field injection
+- Handle errors gracefully and provide meaningful messages
+</Tip>
+
+<Warning>
+Do not modify the `PluginContext` instance. It's provided for read-only access to plugin information.
+</Warning>
+
+## Next Steps
+
+- Learn about [plugin project structure](/developer/plugin/structure)
+- Understand the [plugin lifecycle](/developer/plugin/lifecycle)
+- Create [custom extensions and APIs](/developer/plugin/api-extension)
+- Add [custom endpoints](/developer/plugin/custom-endpoints)

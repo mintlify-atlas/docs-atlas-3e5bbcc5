@@ -1,0 +1,429 @@
+---
+title: Theme system
+description: Learn how Halo's theme system enables flexible and powerful site design
+---
+
+Themes control the visual presentation of your Halo site. They use template engines to render content, can be customized through settings, and integrate seamlessly with Halo's extension system.
+
+## What are themes?
+
+A Halo theme is a package that contains:
+
+- Template files for rendering pages
+- Static assets (CSS, JavaScript, images)
+- Theme configuration and settings
+- Custom template descriptors
+- Theme metadata
+
+<Info>
+Halo themes use template engines like Thymeleaf to render dynamic content with data from extensions.
+</Info>
+
+## Theme structure
+
+Every theme follows a standard directory structure:
+
+```
+my-theme/
+├── theme.yaml                 # Theme metadata
+├── settings.yaml              # Theme settings definition
+├── templates/                 # Template files
+│   ├── index.html            # Homepage
+│   ├── post.html             # Single post
+│   ├── post_*.html           # Custom post templates
+│   ├── page.html             # Single page
+│   ├── page_*.html           # Custom page templates
+│   ├── category.html         # Category archive
+│   ├── tag.html              # Tag archive
+│   ├── archives.html         # Date archives
+│   └── modules/              # Reusable components
+│       ├── header.html
+│       ├── footer.html
+│       └── sidebar.html
+└── assets/                    # Static assets
+    ├── css/
+    │   └── style.css
+    ├── js/
+    │   └── main.js
+    └── images/
+```
+
+## Theme metadata
+
+Every theme has a `theme.yaml` manifest:
+
+```yaml
+apiVersion: theme.halo.run/v1alpha1
+kind: Theme
+metadata:
+  name: my-awesome-theme
+spec:
+  displayName: "My Awesome Theme"
+  author:
+    name: Jane Smith
+    website: https://example.com
+  description: "A beautiful, responsive theme for Halo"
+  logo: https://example.com/logo.png
+  homepage: https://github.com/example/my-theme
+  repo: https://github.com/example/my-theme
+  version: "1.0.0"
+  requires: ">=2.0.0"
+  settingName: theme-my-awesome-theme-setting
+  configMapName: theme-my-awesome-theme-configmap
+  customTemplates:
+    post:
+      - name: feature
+        description: Featured post layout
+        screenshot: screenshot-feature.png
+        file: post_feature.html
+    page:
+      - name: landing
+        description: Landing page layout
+        file: page_landing.html
+```
+
+<Tip>
+Custom templates allow content authors to choose different layouts for posts and pages.
+</Tip>
+
+## Template engine
+
+Halo uses Thymeleaf as its template engine, providing powerful templating capabilities:
+
+### Basic template
+
+```html
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${site.title}">Site Title</title>
+    <link rel="stylesheet" th:href="@{/assets/css/style.css}">
+</head>
+<body>
+    <header th:replace="~{modules/header :: header}"></header>
+    
+    <main>
+        <h1 th:text="${post.spec.title}">Post Title</h1>
+        <div class="content" th:utext="${post.content}"></div>
+    </main>
+    
+    <footer th:replace="~{modules/footer :: footer}"></footer>
+</body>
+</html>
+```
+
+### Template variables
+
+Halo provides several variables to templates:
+
+**Site variables**:
+- `${site.title}` - Site title
+- `${site.subtitle}` - Site subtitle
+- `${site.url}` - Site URL
+
+**Content variables**:
+- `${post}` - Current post (on post pages)
+- `${page}` - Current page (on page pages)
+- `${posts}` - List of posts (on index/archive pages)
+- `${categories}` - Categories
+- `${tags}` - Tags
+
+**Context variables**:
+- `${user}` - Current logged-in user
+- `${theme}` - Current theme settings
+
+## Template types
+
+Different templates render different types of pages:
+
+<AccordionGroup>
+  <Accordion title="index.html - Homepage">
+    Renders the site homepage with recent posts.
+    
+    ```html
+    <div th:each="post : ${posts.items}">
+        <h2><a th:href="${post.status.permalink}" 
+               th:text="${post.spec.title}">Post Title</a></h2>
+        <p th:text="${post.status.excerpt}">Excerpt</p>
+    </div>
+    ```
+  </Accordion>
+  
+  <Accordion title="post.html - Single post">
+    Renders individual blog posts.
+    
+    ```html
+    <article>
+        <h1 th:text="${post.spec.title}">Post Title</h1>
+        <time th:datetime="${post.spec.publishTime}" 
+              th:text="${#dates.format(post.spec.publishTime, 'yyyy-MM-dd')}"></time>
+        <div th:utext="${post.content.content}"></div>
+    </article>
+    ```
+  </Accordion>
+  
+  <Accordion title="page.html - Single page">
+    Renders standalone pages.
+    
+    ```html
+    <article>
+        <h1 th:text="${singlePage.spec.title}">Page Title</h1>
+        <div th:utext="${singlePage.content.content}"></div>
+    </article>
+    ```
+  </Accordion>
+  
+  <Accordion title="category.html - Category archive">
+    Lists posts in a category.
+    
+    ```html
+    <h1>Category: <span th:text="${category.spec.displayName}"></span></h1>
+    <div th:each="post : ${posts.items}">
+        <!-- Post list item -->
+    </div>
+    ```
+  </Accordion>
+  
+  <Accordion title="tag.html - Tag archive">
+    Lists posts with a tag.
+    
+    ```html
+    <h1>Tag: <span th:text="${tag.spec.displayName}"></span></h1>
+    <div th:each="post : ${posts.items}">
+        <!-- Post list item -->
+    </div>
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Finders API
+
+Themes can query data using Finder APIs:
+
+```html
+<!-- Get recent posts -->
+<div th:with="posts=${postFinder.list(1, 5)}">
+    <div th:each="post : ${posts.items}">
+        <h3 th:text="${post.spec.title}"></h3>
+    </div>
+</div>
+
+<!-- Get categories -->
+<ul th:with="categories=${categoryFinder.listAll()}">
+    <li th:each="category : ${categories}">
+        <a th:href="${category.status.permalink}" 
+           th:text="${category.spec.displayName}"></a>
+    </li>
+</ul>
+
+<!-- Get tags -->
+<div th:with="tags=${tagFinder.listAll()}">
+    <span th:each="tag : ${tags}" class="tag">
+        <a th:href="${tag.status.permalink}" 
+           th:text="${tag.spec.displayName}"></a>
+    </span>
+</div>
+```
+
+<Note>
+Finders provide read-only access to extensions, optimized for template rendering.
+</Note>
+
+## Theme settings
+
+Themes can define customizable settings:
+
+```yaml
+# settings.yaml
+apiVersion: v1alpha1
+kind: Setting
+metadata:
+  name: theme-my-awesome-theme-setting
+spec:
+  forms:
+    - group: basic
+      label: Basic Settings
+      formSchema:
+        - $formkit: text
+          name: primaryColor
+          label: Primary Color
+          value: "#0e7490"
+        - $formkit: select
+          name: layout
+          label: Layout Style
+          value: "wide"
+          options:
+            - label: Wide
+              value: wide
+            - label: Boxed
+              value: boxed
+    - group: social
+      label: Social Media
+      formSchema:
+        - $formkit: text
+          name: twitter
+          label: Twitter Handle
+        - $formkit: text
+          name: github
+          label: GitHub Username
+```
+
+Access settings in templates:
+
+```html
+<style>
+    :root {
+        --primary-color: [[${theme.config.basic.primaryColor}]];
+    }
+</style>
+
+<div th:class="'layout-' + ${theme.config.basic.layout}">
+    <!-- Content -->
+</div>
+
+<div class="social-links" th:if="${theme.config.social.twitter}">
+    <a th:href="'https://twitter.com/' + ${theme.config.social.twitter}">Twitter</a>
+</div>
+```
+
+## Static assets
+
+Reference theme assets using the `@{}` syntax:
+
+```html
+<!-- CSS -->
+<link rel="stylesheet" th:href="@{/assets/css/style.css}">
+
+<!-- JavaScript -->
+<script th:src="@{/assets/js/main.js}"></script>
+
+<!-- Images -->
+<img th:src="@{/assets/images/logo.png}" alt="Logo">
+```
+
+<Tip>
+Assets are automatically served from the theme's assets directory.
+</Tip>
+
+## Template fragments
+
+Create reusable template fragments:
+
+```html
+<!-- modules/header.html -->
+<header th:fragment="header">
+    <nav>
+        <a th:href="@{/}">Home</a>
+        <a th:href="@{/archives}">Archives</a>
+    </nav>
+</header>
+
+<!-- Include in other templates -->
+<div th:replace="~{modules/header :: header}"></div>
+```
+
+## Comment widget
+
+Integrate comments into your theme:
+
+```html
+<!-- Comment widget for posts -->
+<div th:if="${post.spec.allowComment}">
+    <halo:comment 
+        group="content.halo.run"
+        kind="Post"
+        th:attr="name=${post.metadata.name}"
+        colorScheme="light"
+    />
+</div>
+```
+
+## Pagination
+
+Handle paginated content:
+
+```html
+<div th:if="${posts.hasNext() || posts.hasPrevious()}" class="pagination">
+    <a th:if="${posts.hasPrevious()}" 
+       th:href="@{/(page=${posts.page - 1})}">Previous</a>
+    
+    <span th:text="'Page ' + ${posts.page} + ' of ' + ${posts.totalPages}"></span>
+    
+    <a th:if="${posts.hasNext()}" 
+       th:href="@{/(page=${posts.page + 1})}">Next</a>
+</div>
+```
+
+## Custom templates
+
+Define custom templates for specific content:
+
+```yaml
+# In theme.yaml
+spec:
+  customTemplates:
+    post:
+      - name: gallery
+        description: Gallery post layout
+        file: post_gallery.html
+```
+
+Create the template file:
+
+```html
+<!-- templates/post_gallery.html -->
+<article class="post-gallery">
+    <h1 th:text="${post.spec.title}"></h1>
+    <div class="gallery">
+        <!-- Gallery-specific layout -->
+    </div>
+</article>
+```
+
+Users can select this template when creating posts.
+
+## Theme status
+
+Themes have a lifecycle managed by Halo:
+
+**READY**: Theme is active and serving content.
+
+**FAILED**: Theme encountered an error during activation.
+
+**UNKNOWN**: Theme status cannot be determined.
+
+## Best practices
+
+Follow these guidelines for theme development:
+
+**Mobile-first design**: Ensure responsive layouts for all screen sizes.
+
+**Performance optimization**: Minimize CSS/JS, optimize images, use lazy loading.
+
+**Accessibility**: Use semantic HTML, proper ARIA labels, keyboard navigation.
+
+**SEO-friendly**: Include meta tags, structured data, sitemap support.
+
+**Customizable**: Provide settings for colors, layouts, and features.
+
+**Clean code**: Use consistent formatting, comments, and organization.
+
+**Test thoroughly**: Verify all templates, edge cases, and settings.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Theme basics" icon="palette" href="/developer/theme/basics">
+    Start building your first theme
+  </Card>
+  <Card title="Theme structure" icon="folder-tree" href="/developer/theme/structure">
+    Learn about theme project structure
+  </Card>
+  <Card title="Templates" icon="file-code" href="/developer/theme/templates">
+    Master template development
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/developer/theme/configuration">
+    Configure theme settings
+  </Card>
+</CardGroup>

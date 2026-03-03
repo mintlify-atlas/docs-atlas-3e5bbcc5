@@ -1,0 +1,470 @@
+---
+title: Creating Custom Extensions
+description: Learn how to define and work with custom Extensions in Halo plugins
+---
+
+Extensions are custom resources that extend Halo's data model. They are similar to Kubernetes Custom Resources and provide a powerful way to add new functionality to Halo.
+
+## What is an Extension?
+
+An Extension is a custom data type that:
+
+- Is stored and managed by Halo's extension system
+- Has a defined schema (using Java classes and annotations)
+- Can be queried and manipulated via the Extension API
+- Can trigger reconciliation logic when changed
+- Can be accessed through REST APIs automatically
+
+## Extension Interface
+
+All Extensions must implement the `Extension` interface:
+
+```java
+package run.halo.app.extension;
+
+/**
+ * Extension represents a custom resource in Halo.
+ * It contains GroupVersionKind and Metadata.
+ */
+public interface Extension extends ExtensionOperator, Comparable<Extension> {
+    // Extensions are comparable by metadata.name
+    @Override
+    default int compareTo(Extension another) {
+        if (another == null || another.getMetadata() == null) {
+            return 1;
+        }
+        if (getMetadata() == null) {
+            return -1;
+        }
+        return Objects.compare(
+            getMetadata().getName(), 
+            another.getMetadata().getName(),
+            Comparator.naturalOrder()
+        );
+    }
+}
+```
+
+## Using AbstractExtension
+
+Most Extensions extend `AbstractExtension` for convenience:
+
+```java
+package run.halo.app.extension;
+
+import lombok.Data;
+
+@Data
+public abstract class AbstractExtension implements Extension {
+    private String apiVersion;  // e.g., "myplugin.example.com/v1alpha1"
+    private String kind;        // e.g., "Article"
+    private MetadataOperator metadata; // name, labels, annotations, etc.
+}
+```
+
+## The @GVK Annotation
+
+Every Extension must be annotated with `@GVK` to define its identity:
+
+```java
+package run.halo.app.extension;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface GVK {
+    String group();     // API group
+    String version();   // API version
+    String kind();      // Resource type
+    String plural();    // Plural name for APIs
+    String singular();  // Singular name for display
+}
+```
+
+### GVK Parameters Explained
+
+- **group**: Your plugin's unique identifier (e.g., `myplugin.example.com`)
+- **version**: API version following Kubernetes conventions (e.g., `v1alpha1`, `v1beta1`, `v1`)
+- **kind**: The resource type name in PascalCase (e.g., `Article`, `Comment`)
+- **plural**: Used in API paths (e.g., `articles`, `comments`)
+- **singular**: Used for display purposes (e.g., `article`, `comment`)
+
+## Creating a Custom Extension
+
+<Steps>
+
+### Define the Extension class
+
+```java
+package com.example.myplugin.extension;
+
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import run.halo.app.extension.AbstractExtension;
+import run.halo.app.extension.GVK;
+
+@Data
+@EqualsAndHashCode(callSuper = true)
+@GVK(
+    group = "content.myplugin.io",
+    version = "v1alpha1",
+    kind = "Article",
+    plural = "articles",
+    singular = "article"
+)
+public class Article extends AbstractExtension {
+    
+    private ArticleSpec spec;
+    private ArticleStatus status;
+}
+```
+
+### Define the Spec
+
+The `spec` contains the desired state:
+
+```java
+@Data
+public static class ArticleSpec {
+    
+    @Schema(required = true, minLength = 1, maxLength = 100)
+    private String title;
+    
+    @Schema(required = true)
+    private String content;
+    
+    private String author;
+    
+    private List<String> tags;
+    
+    private Boolean published;
+    
+    private Instant publishTime;
+}
+```
+
+### Define the Status
+
+The `status` contains the observed state:
+
+```java
+@Data
+public static class ArticleStatus {
+    
+    private Long views;
+    
+    private Long likes;
+    
+    private String permalink;
+    
+    private Instant lastModified;
+    
+    private ConditionList conditions;
+}
+```
+
+### Register the Extension
+
+Create a YAML file in `resources/extensions/`:
+
+```yaml
+# extensions/article-extension.yaml
+apiVersion: content.myplugin.io/v1alpha1
+kind: Article
+metadata:
+  name: sample-article
+spec:
+  title: My First Article
+  content: This is the article content
+  author: admin
+  tags:
+    - tutorial
+    - halo
+  published: true
+  publishTime: "2024-01-01T00:00:00Z"
+```
+
+</Steps>
+
+## Working with Extensions
+
+### ExtensionClient
+
+Use `ExtensionClient` for synchronous operations:
+
+```java
+import run.halo.app.extension.ExtensionClient;
+
+@Service
+public class ArticleService {
+    private final ExtensionClient client;
+    
+    public ArticleService(ExtensionClient client) {
+        this.client = client;
+    }
+    
+    // Fetch by name
+    public Optional<Article> getArticle(String name) {
+        return client.fetch(Article.class, name);
+    }
+    
+    // List all articles
+    public List<Article> listArticles() {
+        return client.list(Article.class, null, null);
+    }
+    
+    // Create an article
+    public Article createArticle(Article article) {
+        return client.create(article);
+    }
+    
+    // Update an article
+    public Article updateArticle(Article article) {
+        return client.update(article);
+    }
+    
+    // Delete an article
+    public void deleteArticle(String name) {
+        client.delete(Article.class, name);
+    }
+}
+```
+
+### ReactiveExtensionClient
+
+Use `ReactiveExtensionClient` for reactive operations:
+
+```java
+import run.halo.app.extension.ReactiveExtensionClient;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@Service
+public class ReactiveArticleService {
+    private final ReactiveExtensionClient client;
+    
+    public ReactiveArticleService(ReactiveExtensionClient client) {
+        this.client = client;
+    }
+    
+    // Fetch by name
+    public Mono<Article> getArticle(String name) {
+        return client.fetch(Article.class, name);
+    }
+    
+    // List all articles
+    public Flux<Article> listArticles() {
+        return client.list(Article.class, null, null);
+    }
+    
+    // Create an article
+    public Mono<Article> createArticle(Article article) {
+        return client.create(article);
+    }
+    
+    // Update an article
+    public Mono<Article> updateArticle(Article article) {
+        return client.update(article);
+    }
+    
+    // Delete an article
+    public Mono<Void> deleteArticle(String name) {
+        return client.delete(Article.class, name);
+    }
+}
+```
+
+## Querying Extensions
+
+### Filtering with Predicates
+
+```java
+import java.util.function.Predicate;
+
+public List<Article> getPublishedArticles() {
+    Predicate<Article> publishedFilter = article -> 
+        article.getSpec().getPublished() != null 
+        && article.getSpec().getPublished();
+    
+    return client.list(Article.class, publishedFilter, null);
+}
+```
+
+### Sorting
+
+```java
+import java.util.Comparator;
+
+public List<Article> getArticlesByDate() {
+    Comparator<Article> dateComparator = 
+        Comparator.comparing(
+            article -> article.getSpec().getPublishTime(),
+            Comparator.nullsLast(Comparator.reverseOrder())
+        );
+    
+    return client.list(Article.class, null, dateComparator);
+}
+```
+
+### Using Labels
+
+```java
+import run.halo.app.extension.Metadata;
+
+public void addLabels(Article article) {
+    var metadata = article.getMetadata();
+    if (metadata.getLabels() == null) {
+        metadata.setLabels(new HashMap<>());
+    }
+    metadata.getLabels().put("featured", "true");
+    metadata.getLabels().put("category", "tech");
+    
+    client.update(article);
+}
+
+public List<Article> getFeaturedArticles() {
+    return client.list(Article.class, 
+        article -> "true".equals(
+            article.getMetadata().getLabels().get("featured")
+        ),
+        null
+    );
+}
+```
+
+## Schema Validation
+
+The `Scheme` class builds OpenAPI schemas for validation:
+
+```java
+import run.halo.app.extension.Scheme;
+
+public class SchemeExample {
+    
+    public void buildScheme() {
+        // Automatically builds schema from @GVK and class structure
+        Scheme scheme = Scheme.buildFromType(Article.class);
+        
+        GroupVersionKind gvk = scheme.groupVersionKind();
+        System.out.println(gvk); // content.myplugin.io/v1alpha1/Article
+        
+        String plural = scheme.plural();
+        System.out.println(plural); // articles
+    }
+}
+```
+
+## Metadata Fields
+
+All Extensions have metadata:
+
+```java
+import run.halo.app.extension.Metadata;
+
+public void workWithMetadata(Article article) {
+    Metadata metadata = article.getMetadata();
+    
+    // Basic fields
+    String name = metadata.getName();  // Unique identifier
+    Long version = metadata.getVersion(); // Optimistic locking
+    Instant creationTime = metadata.getCreationTimestamp();
+    
+    // Labels (for filtering and grouping)
+    Map<String, String> labels = metadata.getLabels();
+    if (labels != null) {
+        String category = labels.get("category");
+    }
+    
+    // Annotations (for arbitrary metadata)
+    Map<String, String> annotations = metadata.getAnnotations();
+    if (annotations != null) {
+        String note = annotations.get("note");
+    }
+    
+    // Finalizers (for cleanup logic)
+    List<String> finalizers = metadata.getFinalizers();
+}
+```
+
+## Automatic REST API
+
+Once an Extension is registered, Halo automatically generates REST endpoints:
+
+```
+GET    /apis/content.myplugin.io/v1alpha1/articles
+POST   /apis/content.myplugin.io/v1alpha1/articles
+GET    /apis/content.myplugin.io/v1alpha1/articles/{name}
+PUT    /apis/content.myplugin.io/v1alpha1/articles/{name}
+DELETE /apis/content.myplugin.io/v1alpha1/articles/{name}
+```
+
+## Extension Examples
+
+### Simple Extension
+
+```java
+@Data
+@EqualsAndHashCode(callSuper = true)
+@GVK(group = "tools.myplugin.io", version = "v1", 
+     kind = "Bookmark", plural = "bookmarks", singular = "bookmark")
+public class Bookmark extends AbstractExtension {
+    
+    private BookmarkSpec spec;
+    
+    @Data
+    public static class BookmarkSpec {
+        private String url;
+        private String title;
+        private String description;
+    }
+}
+```
+
+### Extension with Status
+
+```java
+@Data
+@EqualsAndHashCode(callSuper = true)
+@GVK(group = "analytics.myplugin.io", version = "v1alpha1",
+     kind = "Report", plural = "reports", singular = "report")
+public class Report extends AbstractExtension {
+    
+    private ReportSpec spec;
+    private ReportStatus status;
+    
+    @Data
+    public static class ReportSpec {
+        private String title;
+        private Instant startDate;
+        private Instant endDate;
+    }
+    
+    @Data
+    public static class ReportStatus {
+        private String state;  // "pending", "processing", "completed"
+        private String downloadUrl;
+        private Instant completedAt;
+    }
+}
+```
+
+## Best Practices
+
+<Tip>
+- Use descriptive group names (e.g., `content.myplugin.io`)
+- Follow semantic versioning for API versions (`v1alpha1` → `v1beta1` → `v1`)
+- Keep specs immutable when possible; use status for runtime state
+- Use labels for filtering, annotations for metadata
+- Always validate input in your reconcilers
+- Document your Extension schemas with Swagger annotations
+</Tip>
+
+<Warning>
+Changing the `@GVK` annotation after releasing your plugin will break existing data. Plan your API design carefully.
+</Warning>
+
+## Next Steps
+
+- Add [custom endpoints](/developer/plugin/custom-endpoints) for complex queries
+- Implement [reconcilers](/developer/plugin/lifecycle) to react to Extension changes
+- Configure [plugin settings](/developer/plugin/configuration)
+- Handle [events](/developer/plugin/events) for Extensions

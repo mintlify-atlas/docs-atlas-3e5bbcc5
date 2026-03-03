@@ -1,0 +1,306 @@
+---
+title: Plugin Management APIs
+description: Install, configure, enable, disable and manage plugins in Halo CMS
+---
+
+The Plugin Management APIs allow you to manage plugins in Halo CMS, including installation, configuration, enabling/disabling, and upgrades.
+
+## Plugin Listing
+
+### List Plugins
+
+Retrieve a paginated list of plugins with filtering options.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/plugins?page=0&size=20" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField query="page" type="integer" default="0">
+  Page number. Default is 0.
+</ParamField>
+
+<ParamField query="size" type="integer" default="0">
+  Size number. Default is 0.
+</ParamField>
+
+<ParamField query="keyword" type="string">
+  Keyword of plugin name or description
+</ParamField>
+
+<ParamField query="enabled" type="boolean">
+  Whether the plugin is enabled
+</ParamField>
+
+<ParamField query="labelSelector" type="array">
+  Label selector. e.g.: hidden!=true
+</ParamField>
+
+<ParamField query="fieldSelector" type="array">
+  Field selector. e.g.: metadata.name==halo
+</ParamField>
+
+<ParamField query="sort" type="array">
+  Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.
+</ParamField>
+
+<ResponseField name="items" type="array">
+  Array of plugin objects
+</ResponseField>
+
+<ResponseField name="page" type="integer">
+  Current page number
+</ResponseField>
+
+<ResponseField name="size" type="integer">
+  Size of each page
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of plugins
+</ResponseField>
+
+<ResponseField name="totalPages" type="integer">
+  Total number of pages
+</ResponseField>
+
+## Plugin Installation
+
+### Install Plugin (File Upload)
+
+Install a plugin by uploading a JAR file.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/plugins/install" \
+  -H "Authorization: Bearer {token}" \
+  -F "file=@/path/to/plugin.jar"
+```
+
+<ResponseField name="plugin" type="object">
+  The installed plugin object
+</ResponseField>
+
+<ResponseField name="metadata.name" type="string">
+  Plugin identifier
+</ResponseField>
+
+<ResponseField name="spec.displayName" type="string">
+  Display name of the plugin
+</ResponseField>
+
+<ResponseField name="spec.version" type="string">
+  Plugin version
+</ResponseField>
+
+<ResponseField name="spec.enabled" type="boolean">
+  Whether the plugin is enabled
+</ResponseField>
+
+### Install Plugin from URI
+
+Install a plugin from a remote URL.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/plugins/-/install-from-uri" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "uri": "https://example.com/plugins/my-plugin.jar"
+  }'
+```
+
+<ParamField body="uri" type="string" required>
+  URL of the plugin JAR file to install
+</ParamField>
+
+<ResponseField name="plugin" type="object">
+  The installed plugin object
+</ResponseField>
+
+## Plugin State Management
+
+### Change Plugin Running State
+
+Start or stop a plugin.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/plugins/{name}/plugin-state" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "enable": true
+  }'
+```
+
+<ParamField path="name" type="string" required>
+  Plugin name
+</ParamField>
+
+<ParamField body="enable" type="boolean" required>
+  Set to `true` to start the plugin, `false` to stop it
+</ParamField>
+
+<ResponseField name="plugin" type="object">
+  The updated plugin object
+</ResponseField>
+
+### Reload Plugin
+
+Reload a plugin by name.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/plugins/{name}/reload" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  Plugin name to reload
+</ParamField>
+
+<ResponseField name="plugin" type="object">
+  The reloaded plugin object
+</ResponseField>
+
+## Plugin Configuration
+
+### Fetch Plugin Setting
+
+Retrieve the setting schema for a plugin.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/plugins/{name}/setting" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  Plugin name
+</ParamField>
+
+<ResponseField name="setting" type="object">
+  The plugin setting schema
+</ResponseField>
+
+### Fetch Plugin Config
+
+Retrieve the current configuration values for a plugin.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/plugins/{name}/json-config" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  Plugin name
+</ParamField>
+
+<ResponseField name="config" type="object">
+  JSON configuration object for the plugin
+</ResponseField>
+
+### Update Plugin Config
+
+Update the configuration of a plugin.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/plugins/{name}/json-config" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setting1": "value1",
+    "setting2": "value2"
+  }'
+```
+
+<ParamField path="name" type="string" required>
+  Plugin name
+</ParamField>
+
+<ParamField body="config" type="object" required>
+  Configuration object with key-value pairs
+</ParamField>
+
+### Reset Plugin Config
+
+Reset the plugin configuration to default values.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/plugins/{name}/reset-config" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  Plugin name
+</ParamField>
+
+<ResponseField name="configMap" type="object">
+  The reset configuration object
+</ResponseField>
+
+## Plugin Upgrades
+
+### Upgrade Plugin (File Upload)
+
+Upgrade a plugin by uploading a new JAR file.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/plugins/{name}/upgrade" \
+  -H "Authorization: Bearer {token}" \
+  -F "file=@/path/to/plugin-v2.jar"
+```
+
+<ParamField path="name" type="string" required>
+  Plugin name to upgrade
+</ParamField>
+
+### Upgrade Plugin from URI
+
+Upgrade a plugin from a remote URL.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/plugins/{name}/upgrade-from-uri" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "uri": "https://example.com/plugins/my-plugin-v2.jar"
+  }'
+```
+
+<ParamField path="name" type="string" required>
+  Plugin name to upgrade
+</ParamField>
+
+<ParamField body="uri" type="string" required>
+  URL of the new plugin version JAR file
+</ParamField>
+
+<ResponseField name="plugin" type="object">
+  The upgraded plugin object
+</ResponseField>
+
+## Plugin Assets
+
+### Fetch CSS Bundle
+
+Merge all CSS bundles of enabled plugins into one.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/plugins/-/bundle.css" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ResponseField name="css" type="string">
+  Merged CSS content from all enabled plugins
+</ResponseField>
+
+### Fetch JS Bundle
+
+Merge all JavaScript bundles of enabled plugins into one.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/plugins/-/bundle.js" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ResponseField name="javascript" type="string">
+  Merged JavaScript content from all enabled plugins
+</ResponseField>

@@ -1,0 +1,259 @@
+---
+title: Categories and tags
+description: Learn how to organize your content using categories and tags in Halo CMS.
+---
+
+Categories and tags help you organize and classify your blog posts, making it easier for readers to discover related content.
+
+## Understanding categories vs tags
+
+**Categories** provide hierarchical organization:
+- Broad topic groupings for your content
+- Can have parent-child relationships (subcategories)
+- Each post typically belongs to one or a few categories
+- Appear in category archives and navigation
+
+**Tags** provide flexible labeling:
+- Specific keywords or topics
+- No hierarchical structure
+- Posts can have many tags
+- Help readers find content through tag clouds or tag archives
+
+<Info>
+  Think of categories as your site's table of contents and tags as the index. Categories organize content into sections, while tags identify specific topics within that content.
+</Info>
+
+## Managing categories
+
+### Creating a category
+
+<Steps>
+  <Step title="Navigate to categories">
+    From the admin dashboard, click on **Categories** in the sidebar.
+  </Step>
+  
+  <Step title="Create new category">
+    Click the **New Category** button to open the category creation form.
+  </Step>
+  
+  <Step title="Enter category details">
+    Fill in the required information:
+    - **Display Name**: The name shown to readers (e.g., "Technology")
+    - **Slug**: URL-friendly identifier (e.g., "technology")
+    - **Description**: Brief description of what content belongs in this category
+    - **Cover Image**: Optional featured image for the category
+  </Step>
+  
+  <Step title="Configure settings">
+    Set additional options:
+    - **Priority**: Controls display order (higher numbers appear first)
+    - **Template**: Custom template for the category archive page
+    - **Post Template**: Default template for posts in this category
+  </Step>
+  
+  <Step title="Save the category">
+    Click **Save** to create the category.
+  </Step>
+</Steps>
+
+### Creating subcategories
+
+To organize categories hierarchically:
+
+<Steps>
+  <Step title="Create or edit parent category">
+    Open the parent category you want to add subcategories to.
+  </Step>
+  
+  <Step title="Create child category">
+    Create a new category as described above.
+  </Step>
+  
+  <Step title="Set parent relationship">
+    In the category settings, select the parent category from the **Parent Category** dropdown.
+  </Step>
+  
+  <Step title="Save">
+    Click **Save** to establish the parent-child relationship.
+  </Step>
+</Steps>
+
+<Note>
+  When you query posts in a parent category, Halo automatically includes posts from all subcategories unless you enable the "Prevent Parent Post Cascade Query" option in the category settings.
+</Note>
+
+### Hiding categories from lists
+
+You can hide categories and their posts from public category lists while still allowing direct access:
+
+<Steps>
+  <Step title="Edit the category">
+    Open the category you want to hide.
+  </Step>
+  
+  <Step title="Enable hide option">
+    Toggle the **Hide from List** option in the category settings.
+  </Step>
+  
+  <Step title="Save changes">
+    Click **Save** to apply the setting.
+  </Step>
+</Steps>
+
+<Warning>
+  The "Hide from List" option only affects top-level categories. It will also hide all subcategories and their associated posts from category lists on your theme.
+</Warning>
+
+### Editing a category
+
+<Steps>
+  <Step title="Find the category">
+    Navigate to **Categories** and locate the category you want to edit.
+  </Step>
+  
+  <Step title="Open the editor">
+    Click on the category name or the **Edit** button.
+  </Step>
+  
+  <Step title="Make changes">
+    Update the name, description, settings, or other properties.
+  </Step>
+  
+  <Step title="Save changes">
+    Click **Update** to save your changes.
+  </Step>
+</Steps>
+
+### Deleting a category
+
+<Steps>
+  <Step title="Remove posts">
+    Before deleting, reassign posts to other categories or remove the category assignment from affected posts.
+  </Step>
+  
+  <Step title="Delete the category">
+    Click the **Delete** button next to the category name.
+  </Step>
+  
+  <Step title="Confirm deletion">
+    Confirm the action when prompted. The category will be permanently removed.
+  </Step>
+</Steps>
+
+<Warning>
+  If a category has subcategories, you must delete or reassign the subcategories first before deleting the parent category.
+</Warning>
+
+## Managing tags
+
+### Creating a tag
+
+<Steps>
+  <Step title="Navigate to tags">
+    From the admin dashboard, click on **Tags** in the sidebar.
+  </Step>
+  
+  <Step title="Create new tag">
+    Click the **New Tag** button to open the tag creation form.
+  </Step>
+  
+  <Step title="Enter tag details">
+    Fill in the required information:
+    - **Display Name**: The name shown to readers (e.g., "JavaScript")
+    - **Slug**: URL-friendly identifier (e.g., "javascript")
+    - **Color**: Optional color code for visual identification (e.g., "#FF5733")
+    - **Cover Image**: Optional featured image for the tag archive page
+  </Step>
+  
+  <Step title="Save the tag">
+    Click **Save** to create the tag.
+  </Step>
+</Steps>
+
+<Tip>
+  You can also create tags on-the-fly when editing a post. Simply type a new tag name in the tags field, and Halo will create it automatically.
+</Tip>
+
+### Editing a tag
+
+<Steps>
+  <Step title="Find the tag">
+    Navigate to **Tags** and locate the tag you want to edit.
+  </Step>
+  
+  <Step title="Open the editor">
+    Click on the tag name or the **Edit** button.
+  </Step>
+  
+  <Step title="Make changes">
+    Update the name, slug, color, cover image, or other properties.
+  </Step>
+  
+  <Step title="Save changes">
+    Click **Update** to save your changes.
+  </Step>
+</Steps>
+
+### Deleting a tag
+
+<Steps>
+  <Step title="Locate the tag">
+    Navigate to **Tags** and find the tag you want to delete.
+  </Step>
+  
+  <Step title="Delete the tag">
+    Click the **Delete** button next to the tag name.
+  </Step>
+  
+  <Step title="Confirm deletion">
+    Confirm the action when prompted. The tag will be removed from all posts and permanently deleted.
+  </Step>
+</Steps>
+
+<Note>
+  Deleting a tag only removes the tag itself. Posts that had this tag will remain published and unaffected, except they will no longer be associated with the deleted tag.
+</Note>
+
+## Assigning categories and tags to posts
+
+When creating or editing a post:
+
+<Steps>
+  <Step title="Open post editor">
+    Create a new post or edit an existing one.
+  </Step>
+  
+  <Step title="Access settings tab">
+    Click the **Settings** tab in the post editor.
+  </Step>
+  
+  <Step title="Select categories">
+    In the **Categories** section, select one or more categories from the dropdown menu.
+  </Step>
+  
+  <Step title="Add tags">
+    In the **Tags** section, type tag names or select existing tags. Press Enter after each tag to add it.
+  </Step>
+  
+  <Step title="Save the post">
+    Click **Save** or **Update** to apply the changes.
+  </Step>
+</Steps>
+
+## Viewing category and tag statistics
+
+The categories and tags pages display useful statistics:
+
+- **Post Count**: Total number of posts (including drafts) associated with the category or tag
+- **Visible Post Count**: Number of published and public posts
+- **Permalink**: The URL where readers can view all posts in this category or tag
+
+These statistics update automatically as you create, publish, or delete posts.
+
+## Best practices
+
+- **Use categories sparingly**: Create 5-10 main categories for your site. Too many categories can overwhelm readers.
+- **Be generous with tags**: Use specific, descriptive tags to help readers find related content.
+- **Maintain consistency**: Use standardized naming conventions for categories and tags (e.g., "Web Development" not "web dev" or "webdev").
+- **Review regularly**: Periodically audit your categories and tags to merge duplicates or remove unused ones.
+- **Plan your hierarchy**: Think about your category structure before creating content. Reorganizing later can be time-consuming.

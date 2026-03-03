@@ -1,0 +1,404 @@
+---
+title: User Management APIs
+description: Manage users, permissions, roles and authentication in Halo CMS
+---
+
+The User Management APIs provide endpoints for creating, updating and managing users, their permissions, roles, and authentication settings.
+
+## Users
+
+### List Users
+
+Retrieve a paginated list of users with optional filtering.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/users?page=0&size=20" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField query="page" type="integer" default="0">
+  Page number. Default is 0.
+</ParamField>
+
+<ParamField query="size" type="integer" default="0">
+  Size number. Default is 0.
+</ParamField>
+
+<ParamField query="keyword" type="string">
+  Keyword to search users
+</ParamField>
+
+<ParamField query="role" type="string">
+  Filter users by role name
+</ParamField>
+
+<ParamField query="labelSelector" type="array">
+  Label selector. e.g.: hidden!=true
+</ParamField>
+
+<ParamField query="fieldSelector" type="array">
+  Field selector. e.g.: metadata.name==halo
+</ParamField>
+
+<ParamField query="sort" type="array">
+  Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.
+</ParamField>
+
+<ResponseField name="items" type="array">
+  Array of user objects
+</ResponseField>
+
+<ResponseField name="page" type="integer">
+  Current page number
+</ResponseField>
+
+<ResponseField name="size" type="integer">
+  Size of each page
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of users
+</ResponseField>
+
+<ResponseField name="totalPages" type="integer">
+  Total number of pages
+</ResponseField>
+
+### Create User
+
+Create a new user account.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/users" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user": {
+      "metadata": {
+        "name": "johndoe"
+      },
+      "spec": {
+        "displayName": "John Doe",
+        "email": "john@example.com"
+      }
+    },
+    "password": "securepassword123"
+  }'
+```
+
+<ResponseField name="user" type="object">
+  The created user object with metadata and spec
+</ResponseField>
+
+### Get User Detail
+
+Retrieve detailed information about a specific user.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/users/{name}" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  User name/identifier
+</ParamField>
+
+<ResponseField name="user" type="object">
+  The user object
+</ResponseField>
+
+<ResponseField name="roles" type="array">
+  Array of role names assigned to the user
+</ResponseField>
+
+### Get Current User
+
+Get details of the currently authenticated user.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/users/-" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ResponseField name="user" type="object">
+  Current user object
+</ResponseField>
+
+<ResponseField name="roles" type="array">
+  Roles assigned to current user
+</ResponseField>
+
+### Update Current User
+
+Update the profile of the currently authenticated user (excluding password).
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/users/-" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metadata": {
+      "name": "johndoe"
+    },
+    "spec": {
+      "displayName": "John Updated",
+      "email": "john.updated@example.com",
+      "bio": "Software developer"
+    }
+  }'
+```
+
+<ResponseField name="user" type="object">
+  The updated user object
+</ResponseField>
+
+## User Status
+
+### Enable User
+
+Enable a disabled user account.
+
+```bash
+curl -X POST "http://localhost:8091/apis/console.api.security.halo.run/v1alpha1/users/{username}/enable" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="username" type="string" required>
+  Username to enable
+</ParamField>
+
+<ResponseField name="user" type="object">
+  The enabled user object
+</ResponseField>
+
+### Disable User
+
+Disable a user account.
+
+```bash
+curl -X POST "http://localhost:8091/apis/console.api.security.halo.run/v1alpha1/users/{username}/disable" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="username" type="string" required>
+  Username to disable
+</ParamField>
+
+<ResponseField name="user" type="object">
+  The disabled user object
+</ResponseField>
+
+## Password Management
+
+### Change Own Password
+
+Change the password of the currently authenticated user.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/users/-/password" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "oldPassword": "currentpassword",
+    "password": "newpassword123"
+  }'
+```
+
+<ParamField body="oldPassword" type="string" required>
+  Current password for verification
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  New password (minimum 5 characters)
+</ParamField>
+
+### Change User Password (Admin)
+
+Change the password of any user (admin only).
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/users/{name}/password" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "password": "newpassword123"
+  }'
+```
+
+<ParamField path="name" type="string" required>
+  User name. If the name is equal to '-', it will change the password of current user.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  New password (minimum 5 characters)
+</ParamField>
+
+## Avatar Management
+
+### Upload User Avatar
+
+Upload an avatar image for a user.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/users/{name}/avatar" \
+  -H "Authorization: Bearer {token}" \
+  -F "file=@/path/to/avatar.jpg"
+```
+
+<ParamField path="name" type="string" required>
+  User name
+</ParamField>
+
+<ResponseField name="user" type="object">
+  Updated user object with avatar URL
+</ResponseField>
+
+### Delete User Avatar
+
+Remove the avatar of a user.
+
+```bash
+curl -X DELETE "http://localhost:8091/apis/api.console.halo.run/v1alpha1/users/{name}/avatar" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  User name
+</ParamField>
+
+<ResponseField name="user" type="object">
+  Updated user object without avatar
+</ResponseField>
+
+## Permissions
+
+### Get User Permissions
+
+Retrieve all permissions for a specific user.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/users/{name}/permissions" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  User name
+</ParamField>
+
+<ResponseField name="permissions" type="array">
+  Array of permission objects
+</ResponseField>
+
+<ResponseField name="roles" type="array">
+  Array of role names
+</ResponseField>
+
+### Grant Permissions
+
+Grant specific permissions to a user.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/users/{name}/permissions" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "roles": ["contributor", "editor"]
+  }'
+```
+
+<ParamField path="name" type="string" required>
+  User name
+</ParamField>
+
+<ParamField body="roles" type="array" required>
+  Array of role names to grant
+</ParamField>
+
+<ResponseField name="user" type="object">
+  Updated user object with new permissions
+</ResponseField>
+
+## Email Verification
+
+### Send Email Verification Code
+
+Send a verification code to the user's email.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/users/-/send-email-verification-code" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com"
+  }'
+```
+
+<ParamField body="email" type="string" required>
+  Email address to send verification code to
+</ParamField>
+
+### Verify Email
+
+Verify user's email address using the verification code.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/users/-/verify-email" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "123456"
+  }'
+```
+
+<ParamField body="code" type="string" required>
+  Verification code received via email
+</ParamField>
+
+## Authentication Providers
+
+### List Auth Providers
+
+Retrieve all available authentication providers.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/auth-providers" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ResponseField name="providers" type="array">
+  Array of authentication provider objects
+</ResponseField>
+
+### Enable Auth Provider
+
+Enable a specific authentication provider.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/auth-providers/{name}/enable" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  Auth provider name
+</ParamField>
+
+<ResponseField name="provider" type="object">
+  The enabled auth provider
+</ResponseField>
+
+### Disable Auth Provider
+
+Disable a specific authentication provider.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/auth-providers/{name}/disable" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  Auth provider name
+</ParamField>
+
+<ResponseField name="provider" type="object">
+  The disabled auth provider
+</ResponseField>

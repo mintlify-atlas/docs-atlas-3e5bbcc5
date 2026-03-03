@@ -1,0 +1,394 @@
+---
+title: User and role management
+description: Learn how to manage users, roles, and permissions in Halo CMS.
+---
+
+User and role management in Halo allows you to control who can access your site's admin dashboard and what actions they can perform.
+
+## Understanding users and roles
+
+**Users** are individual accounts that can log in to your Halo site. Each user has:
+- A unique username and email address
+- Personal profile information
+- One or more assigned roles
+
+**Roles** define what users can do. They contain:
+- A set of permissions (policy rules)
+- Access to specific resources and actions
+- Can be assigned to multiple users
+
+<Info>
+  Halo uses a role-based access control (RBAC) system. Instead of assigning permissions directly to users, you assign roles, and those roles contain the permissions.
+</Info>
+
+## Managing users
+
+### Creating a user
+
+<Steps>
+  <Step title="Navigate to users">
+    From the admin dashboard, click on **Users** in the sidebar.
+  </Step>
+  
+  <Step title="Create new user">
+    Click the **New User** button to open the user creation form.
+  </Step>
+  
+  <Step title="Enter user details">
+    Fill in the required information:
+    - **Username**: Unique identifier for login (cannot be changed later)
+    - **Display Name**: The name shown publicly on the site
+    - **Email**: Valid email address for notifications and password recovery
+    - **Password**: Initial password (user can change this later)
+  </Step>
+  
+  <Step title="Configure profile">
+    Add optional profile information:
+    - **Avatar**: Upload a profile picture
+    - **Phone**: Contact phone number
+    - **Bio**: Short biography or description
+  </Step>
+  
+  <Step title="Assign roles">
+    Select one or more roles to assign to the user. Roles determine what the user can do.
+  </Step>
+  
+  <Step title="Set account status">
+    Choose whether the account is:
+    - **Active**: User can log in and access assigned resources
+    - **Disabled**: User cannot log in
+  </Step>
+  
+  <Step title="Save the user">
+    Click **Save** to create the user account.
+  </Step>
+</Steps>
+
+<Note>
+  New users receive an email notification with their account details. Make sure your email settings are configured correctly in **Settings** > **Email**.
+</Note>
+
+### Editing user information
+
+To update a user's profile or settings:
+
+<Steps>
+  <Step title="Find the user">
+    Navigate to **Users** and locate the user you want to edit. Use the search bar to find users quickly.
+  </Step>
+  
+  <Step title="Open the editor">
+    Click on the user's name or the **Edit** button to open the user editor.
+  </Step>
+  
+  <Step title="Make changes">
+    Update profile information, change assigned roles, or modify account settings.
+  </Step>
+  
+  <Step title="Save changes">
+    Click **Update** to save your changes.
+  </Step>
+</Steps>
+
+### Resetting user passwords
+
+If a user forgets their password:
+
+<Steps>
+  <Step title="Open user editor">
+    Navigate to **Users**, find the user, and click **Edit**.
+  </Step>
+  
+  <Step title="Reset password">
+    Look for the **Reset Password** option or section.
+  </Step>
+  
+  <Step title="Set new password">
+    Enter a new temporary password or send a password reset email to the user.
+  </Step>
+  
+  <Step title="Save and notify">
+    Click **Save** and inform the user about the password change. They should change it on next login.
+  </Step>
+</Steps>
+
+<Tip>
+  Encourage users to set up two-factor authentication (2FA) for enhanced security. Users can enable 2FA in their profile settings.
+</Tip>
+
+### Disabling user accounts
+
+To temporarily prevent a user from logging in:
+
+<Steps>
+  <Step title="Open user editor">
+    Navigate to **Users**, find the user, and click **Edit**.
+  </Step>
+  
+  <Step title="Disable account">
+    Toggle the **Disabled** option to prevent the user from logging in.
+  </Step>
+  
+  <Step title="Save changes">
+    Click **Update** to apply the change. The user will be logged out immediately.
+  </Step>
+</Steps>
+
+### Deleting users
+
+To permanently remove a user account:
+
+<Steps>
+  <Step title="Reassign content">
+    Before deleting, reassign the user's posts, pages, and other content to another user.
+  </Step>
+  
+  <Step title="Locate the user">
+    Navigate to **Users** and find the user you want to delete.
+  </Step>
+  
+  <Step title="Delete the user">
+    Click the **Delete** button next to the user's name.
+  </Step>
+  
+  <Step title="Confirm deletion">
+    Confirm the action when prompted. The user account will be permanently removed.
+  </Step>
+</Steps>
+
+<Warning>
+  Deleting a user account cannot be undone. Ensure you've backed up any important data and reassigned their content before proceeding.
+</Warning>
+
+## Managing roles
+
+### Understanding default roles
+
+Halo includes several built-in roles:
+
+- **Super Administrator**: Full access to all features and settings
+- **Administrator**: Can manage content, users, and most settings
+- **Editor**: Can publish and manage all content
+- **Author**: Can create and publish their own content
+- **Contributor**: Can create content but cannot publish
+- **Subscriber**: Can only manage their own profile and read content
+
+<Info>
+  Built-in roles are system-reserved and cannot be deleted, but you can create custom roles with specific permissions tailored to your needs.
+</Info>
+
+### Creating a custom role
+
+<Steps>
+  <Step title="Navigate to roles">
+    From the admin dashboard, click on **Roles** in the sidebar.
+  </Step>
+  
+  <Step title="Create new role">
+    Click the **New Role** button to open the role creation form.
+  </Step>
+  
+  <Step title="Enter role details">
+    Fill in the required information:
+    - **Name**: Internal identifier for the role (e.g., "marketing-manager")
+    - **Display Name**: Human-readable name (e.g., "Marketing Manager")
+  </Step>
+  
+  <Step title="Define permissions">
+    Add policy rules to specify what this role can do:
+    - **API Groups**: Which API groups the role can access
+    - **Resources**: Which resource types (posts, pages, users, etc.)
+    - **Verbs**: What actions (create, read, update, delete, list)
+    - **Resource Names**: (Optional) Specific resource instances
+  </Step>
+  
+  <Step title="Set role dependencies">
+    (Optional) Specify if this role depends on other roles or aggregates permissions from other roles.
+  </Step>
+  
+  <Step title="Save the role">
+    Click **Save** to create the custom role.
+  </Step>
+</Steps>
+
+<Note>
+  Creating custom roles requires understanding Halo's permission model. Incorrectly configured roles can lead to security issues or prevent users from accessing needed features.
+</Note>
+
+### Understanding policy rules
+
+Policy rules define permissions in Halo. Each rule specifies:
+
+- **API Groups**: The API group containing the resources (e.g., "content.halo.run", "")
+- **Resources**: The resource types (e.g., "posts", "pages", "users")
+- **Verbs**: Allowed actions (e.g., "get", "list", "create", "update", "delete")
+- **Resource Names**: (Optional) Specific resource instances to restrict access to
+
+**Example policy rule:**
+```json
+{
+  "apiGroups": ["content.halo.run"],
+  "resources": ["posts"],
+  "verbs": ["get", "list", "create", "update"]
+}
+```
+
+This rule allows getting, listing, creating, and updating posts in the "content.halo.run" API group.
+
+### Editing roles
+
+To modify an existing custom role:
+
+<Steps>
+  <Step title="Find the role">
+    Navigate to **Roles** and locate the role you want to edit.
+  </Step>
+  
+  <Step title="Open the editor">
+    Click on the role name or the **Edit** button.
+  </Step>
+  
+  <Step title="Modify permissions">
+    Add, remove, or modify policy rules to change what the role can do.
+  </Step>
+  
+  <Step title="Save changes">
+    Click **Update** to apply the changes. Users with this role will immediately have updated permissions.
+  </Step>
+</Steps>
+
+<Warning>
+  Changing role permissions affects all users assigned to that role. Test permission changes carefully to avoid accidentally granting or removing critical access.
+</Warning>
+
+### Deleting custom roles
+
+To remove a custom role:
+
+<Steps>
+  <Step title="Unassign users">
+    Before deleting, reassign users to different roles or they will lose access.
+  </Step>
+  
+  <Step title="Navigate to roles">
+    Go to **Roles** in the admin dashboard.
+  </Step>
+  
+  <Step title="Delete the role">
+    Click the **Delete** button next to the role name.
+  </Step>
+  
+  <Step title="Confirm deletion">
+    Confirm the action when prompted. The role will be permanently removed.
+  </Step>
+</Steps>
+
+<Note>
+  System-reserved roles (built-in roles) cannot be deleted. You can only delete custom roles you've created.
+</Note>
+
+## Assigning roles to users
+
+You can assign multiple roles to a single user:
+
+<Steps>
+  <Step title="Edit the user">
+    Navigate to **Users**, find the user, and click **Edit**.
+  </Step>
+  
+  <Step title="Manage role assignments">
+    In the **Roles** section, select or deselect roles to assign or remove them.
+  </Step>
+  
+  <Step title="Save changes">
+    Click **Update** to apply the role assignments.
+  </Step>
+</Steps>
+
+<Info>
+  When a user has multiple roles, they receive the combined permissions of all assigned roles. Halo automatically aggregates permissions from all roles.
+</Info>
+
+## Understanding role aggregation
+
+Halo supports role aggregation, where roles can inherit permissions from other roles:
+
+- **Aggregate roles**: Automatically include permissions from roles with specific labels
+- **Role dependencies**: Explicitly specify which roles this role depends on
+
+This allows you to create modular permission sets and compose complex roles from simpler ones.
+
+## Email verification
+
+Users can be required to verify their email addresses:
+
+<Steps>
+  <Step title="User registration">
+    When a user registers or has their email changed, they receive a verification email.
+  </Step>
+  
+  <Step title="Click verification link">
+    The user clicks the link in the email to verify their address.
+  </Step>
+  
+  <Step title="Email verified">
+    Once verified, the user's account is marked as email-verified, and they can access features requiring verification.
+  </Step>
+</Steps>
+
+<Note>
+  You can configure email verification requirements in **Settings** > **Security**. Some features may require verified email addresses for access.
+</Note>
+
+## Two-factor authentication (2FA)
+
+Users can enable 2FA for enhanced security:
+
+<Steps>
+  <Step title="Access user profile">
+    The user logs in and navigates to their profile settings.
+  </Step>
+  
+  <Step title="Enable 2FA">
+    The user toggles the **Two-Factor Authentication** option.
+  </Step>
+  
+  <Step title="Scan QR code">
+    Using an authenticator app (Google Authenticator, Authy, etc.), the user scans the displayed QR code.
+  </Step>
+  
+  <Step title="Enter verification code">
+    The user enters a code from their authenticator app to confirm setup.
+  </Step>
+  
+  <Step title="Save backup codes">
+    The user saves the provided backup codes in a secure location for account recovery.
+  </Step>
+</Steps>
+
+<Tip>
+  Encourage all users with administrative access to enable 2FA for improved account security.
+</Tip>
+
+## Hidden users
+
+Some users may be marked as hidden:
+
+- Hidden users don't appear in public author lists or contributor pages
+- They can still log in and perform their assigned tasks
+- This is useful for service accounts or internal users
+
+To mark a user as hidden, add the appropriate label in the user's metadata settings.
+
+## Best practices for user and role management
+
+- **Follow principle of least privilege**: Give users only the permissions they need
+- **Use roles, not direct permissions**: Always assign permissions through roles, not directly to users
+- **Regular audits**: Periodically review user accounts and role assignments
+- **Remove inactive accounts**: Disable or delete accounts that are no longer needed
+- **Document custom roles**: Keep notes about what each custom role is for
+- **Test new roles**: Create test users to verify role permissions before assigning to real users
+- **Require strong passwords**: Enforce password complexity requirements
+- **Enable 2FA for admins**: Require two-factor authentication for users with administrative access
+- **Monitor user activity**: Regularly review logs for suspicious user activity
+- **Maintain role hierarchy**: Keep your role structure simple and easy to understand

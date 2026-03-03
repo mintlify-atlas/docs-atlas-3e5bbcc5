@@ -1,0 +1,682 @@
+---
+title: Custom Extensions
+description: Create and manage custom extension types with the Extension API
+---
+
+Custom extensions allow you to define your own resource types in Halo CMS, extending the platform with domain-specific models. The Extension API provides full CRUD operations for any custom extension type.
+
+## Overview
+
+Custom extensions follow the same API patterns as core extensions:
+
+- Define extension classes with `@GVK` annotation
+- Automatic REST endpoint generation based on GVK
+- Full CRUD support through unified API
+- Same metadata, versioning, and lifecycle management
+
+## Creating a Custom Extension
+
+### 1. Define the Extension Class
+
+Create a Java class extending `AbstractExtension` with the `@GVK` annotation:
+
+```java
+import run.halo.app.extension.AbstractExtension;
+import run.halo.app.extension.GVK;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper = true)
+@GVK(
+    group = "example.halo.run",
+    version = "v1alpha1",
+    kind = "Book",
+    plural = "books",
+    singular = "book"
+)
+public class Book extends AbstractExtension {
+    private BookSpec spec;
+    private BookStatus status;
+}
+
+@Data
+public class BookSpec {
+    @Schema(requiredMode = REQUIRED, minLength = 1)
+    private String title;
+    
+    @Schema(requiredMode = REQUIRED)
+    private String author;
+    
+    private String isbn;
+    
+    private String description;
+    
+    @Schema(requiredMode = REQUIRED, defaultValue = "0")
+    private Integer price;
+    
+    private List<String> tags;
+}
+
+@Data
+public class BookStatus {
+    private String phase; // AVAILABLE, SOLD_OUT, DISCONTINUED
+    private Integer copiesSold;
+    private Instant lastOrderDate;
+}
+```
+
+### 2. Register the Extension
+
+In your plugin, register the extension type:
+
+```java
+import org.springframework.stereotype.Component;
+import run.halo.app.extension.SchemeManager;
+import run.halo.app.plugin.BasePlugin;
+import run.halo.app.plugin.PluginContext;
+
+@Component
+public class BookPlugin extends BasePlugin {
+    
+    private final SchemeManager schemeManager;
+    
+    public BookPlugin(PluginContext pluginContext, SchemeManager schemeManager) {
+        super(pluginContext);
+        this.schemeManager = schemeManager;
+    }
+    
+    @Override
+    public void start() {
+        // Register the Book extension
+        schemeManager.register(Book.class);
+    }
+    
+    @Override
+    public void stop() {
+        // Unregister on plugin stop
+        schemeManager.unregister(Book.class);
+    }
+}
+```
+
+### 3. Access via REST API
+
+Once registered, your custom extension is immediately available via REST API:
+
+```bash
+GET    /apis/example.halo.run/v1alpha1/books
+POST   /apis/example.halo.run/v1alpha1/books
+GET    /apis/example.halo.run/v1alpha1/books/{name}
+PUT    /apis/example.halo.run/v1alpha1/books/{name}
+PATCH  /apis/example.halo.run/v1alpha1/books/{name}
+DELETE /apis/example.halo.run/v1alpha1/books/{name}
+```
+
+## CRUD Operations
+
+### Create a Custom Extension
+
+Create a new book resource:
+
+```bash
+curl -X POST 'http://localhost:8091/apis/example.halo.run/v1alpha1/books' \
+  -H 'Authorization: Bearer <token>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "apiVersion": "example.halo.run/v1alpha1",
+    "kind": "Book",
+    "metadata": {
+      "name": "effective-java",
+      "labels": {
+        "category": "programming",
+        "language": "java"
+      }
+    },
+    "spec": {
+      "title": "Effective Java",
+      "author": "Joshua Bloch",
+      "isbn": "978-0134685991",
+      "description": "A comprehensive guide to Java best practices",
+      "price": 45,
+      "tags": ["java", "programming", "best-practices"]
+    }
+  }'
+```
+
+<ResponseField name="metadata.name" type="string">
+  The unique identifier for the book
+</ResponseField>
+
+<ResponseField name="metadata.version" type="integer">
+  Initial version is 0, incremented on each update
+</ResponseField>
+
+<ResponseField name="metadata.creationTimestamp" type="string">
+  ISO 8601 timestamp of creation
+</ResponseField>
+
+### List Custom Extensions
+
+List all books with filtering and pagination:
+
+```bash
+curl -X GET 'http://localhost:8091/apis/example.halo.run/v1alpha1/books?labelSelector=category=programming&size=20&page=0' \
+  -H 'Authorization: Bearer <token>'
+```
+
+<ParamField query="page" type="integer" default="0">
+  Page number (0-based)
+</ParamField>
+
+<ParamField query="size" type="integer" default="0">
+  Number of items per page (0 = no pagination)
+</ParamField>
+
+<ParamField query="labelSelector" type="array">
+  Filter by labels (e.g., `category=programming`, `language!=python`)
+</ParamField>
+
+<ParamField query="fieldSelector" type="array">
+  Filter by fields (e.g., `metadata.name==effective-java`)
+</ParamField>
+
+<ParamField query="sort" type="array">
+  Sort by fields (e.g., `metadata.creationTimestamp,desc`)
+</ParamField>
+
+**Response:**
+
+```json
+{
+  "page": 0,
+  "size": 20,
+  "total": 1,
+  "totalPages": 1,
+  "first": true,
+  "last": true,
+  "hasNext": false,
+  "hasPrevious": false,
+  "items": [
+    {
+      "apiVersion": "example.halo.run/v1alpha1",
+      "kind": "Book",
+      "metadata": {
+        "name": "effective-java",
+        "version": 0,
+        "creationTimestamp": "2024-01-15T10:30:00Z",
+        "labels": {
+          "category": "programming",
+          "language": "java"
+        }
+      },
+      "spec": {
+        "title": "Effective Java",
+        "author": "Joshua Bloch",
+        "isbn": "978-0134685991",
+        "price": 45,
+        "tags": ["java", "programming", "best-practices"]
+      }
+    }
+  ]
+}
+```
+
+### Get a Custom Extension
+
+Retrieve a single book by name:
+
+```bash
+curl -X GET 'http://localhost:8091/apis/example.halo.run/v1alpha1/books/effective-java' \
+  -H 'Authorization: Bearer <token>'
+```
+
+**Response:**
+
+```json
+{
+  "apiVersion": "example.halo.run/v1alpha1",
+  "kind": "Book",
+  "metadata": {
+    "name": "effective-java",
+    "version": 2,
+    "creationTimestamp": "2024-01-15T10:30:00Z"
+  },
+  "spec": {
+    "title": "Effective Java (3rd Edition)",
+    "author": "Joshua Bloch",
+    "isbn": "978-0134685991",
+    "price": 50
+  },
+  "status": {
+    "phase": "AVAILABLE",
+    "copiesSold": 127
+  }
+}
+```
+
+### Update a Custom Extension
+
+Update the entire resource (full replacement):
+
+```bash
+curl -X PUT 'http://localhost:8091/apis/example.halo.run/v1alpha1/books/effective-java' \
+  -H 'Authorization: Bearer <token>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "apiVersion": "example.halo.run/v1alpha1",
+    "kind": "Book",
+    "metadata": {
+      "name": "effective-java",
+      "version": 2,
+      "labels": {
+        "category": "programming",
+        "featured": "true"
+      }
+    },
+    "spec": {
+      "title": "Effective Java (3rd Edition)",
+      "author": "Joshua Bloch",
+      "isbn": "978-0134685991",
+      "price": 50
+    }
+  }'
+```
+
+<Warning>
+You must include the current `metadata.version` field. If the version doesn't match (due to concurrent updates), you'll receive a 409 Conflict error.
+</Warning>
+
+### Patch a Custom Extension
+
+Partially update specific fields using JSON Patch:
+
+```bash
+curl -X PATCH 'http://localhost:8091/apis/example.halo.run/v1alpha1/books/effective-java' \
+  -H 'Authorization: Bearer <token>' \
+  -H 'Content-Type: application/json-patch+json' \
+  -d '[
+    {
+      "op": "replace",
+      "path": "/spec/price",
+      "value": 55
+    },
+    {
+      "op": "add",
+      "path": "/metadata/labels/bestseller",
+      "value": "true"
+    }
+  ]'
+```
+
+**Supported Operations:**
+
+- `add`: Add a new field or array element
+- `remove`: Remove a field or array element
+- `replace`: Replace a field's value
+- `copy`: Copy a value from one path to another
+- `move`: Move a value from one path to another
+- `test`: Test that a value matches
+
+### Delete a Custom Extension
+
+Delete a book resource:
+
+```bash
+curl -X DELETE 'http://localhost:8091/apis/example.halo.run/v1alpha1/books/effective-java' \
+  -H 'Authorization: Bearer <token>'
+```
+
+<Info>
+If the resource has finalizers, it will be marked for deletion (with `deletionTimestamp` set) but not actually removed until all finalizers are cleared.
+</Info>
+
+## Advanced Features
+
+### Using Labels for Filtering
+
+Labels are indexed and optimized for querying:
+
+```bash
+# Single label selector
+curl 'http://localhost:8091/apis/example.halo.run/v1alpha1/books?labelSelector=category=programming'
+
+# Multiple label selectors (AND)
+curl 'http://localhost:8091/apis/example.halo.run/v1alpha1/books?labelSelector=category=programming&labelSelector=featured=true'
+
+# Not equals
+curl 'http://localhost:8091/apis/example.halo.run/v1alpha1/books?labelSelector=category!=fiction'
+
+# Label exists
+curl 'http://localhost:8091/apis/example.halo.run/v1alpha1/books?labelSelector=bestseller'
+
+# Label doesn't exist
+curl 'http://localhost:8091/apis/example.halo.run/v1alpha1/books?labelSelector=!discontinued'
+```
+
+### Using Field Selectors
+
+Filter by specific field values:
+
+```bash
+# Filter by name
+curl 'http://localhost:8091/apis/example.halo.run/v1alpha1/books?fieldSelector=metadata.name==effective-java'
+
+# Filter by creation time (greater than)
+curl 'http://localhost:8091/apis/example.halo.run/v1alpha1/books?fieldSelector=metadata.creationTimestamp>2024-01-01T00:00:00Z'
+```
+
+### Sorting Results
+
+Sort by one or more fields:
+
+```bash
+# Sort by creation time (descending)
+curl 'http://localhost:8091/apis/example.halo.run/v1alpha1/books?sort=metadata.creationTimestamp,desc'
+
+# Multiple sort fields
+curl 'http://localhost:8091/apis/example.halo.run/v1alpha1/books?sort=spec.price,desc&sort=metadata.name,asc'
+```
+
+### Custom Indexing
+
+For frequently queried fields, create custom indexes:
+
+```java
+import run.halo.app.extension.index.IndexSpec;
+import static run.halo.app.extension.index.IndexAttributeFactory.simpleAttribute;
+
+@Component
+public class BookIndexConfiguration {
+    
+    @Autowired
+    public void configureIndexes(IndexBuilderRegistry registry) {
+        registry.add(IndexSpec.builder(Book.class)
+            .add(IndexSpec.IndexEntry.of(
+                "spec.author",
+                simpleAttribute(Book.class, book -> book.getSpec().getAuthor())
+            ))
+            .add(IndexSpec.IndexEntry.of(
+                "spec.price",
+                simpleAttribute(Book.class, book -> book.getSpec().getPrice())
+            ))
+            .build()
+        );
+    }
+}
+```
+
+Now you can use field selectors on these indexed fields:
+
+```bash
+curl 'http://localhost:8091/apis/example.halo.run/v1alpha1/books?fieldSelector=spec.author==Joshua+Bloch'
+```
+
+## Validation
+
+Use schema annotations to add validation:
+
+```java
+import io.swagger.v3.oas.annotations.media.Schema;
+import static io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED;
+
+@Data
+public class BookSpec {
+    @Schema(requiredMode = REQUIRED, minLength = 1, maxLength = 255)
+    private String title;
+    
+    @Schema(requiredMode = REQUIRED, pattern = "^[A-Z][a-z]+ [A-Z][a-z]+$")
+    private String author;
+    
+    @Schema(pattern = "^(97[89])?\\d{9}(\\d|X)$")
+    private String isbn;
+    
+    @Schema(minimum = "0", maximum = "999999")
+    private Integer price;
+    
+    @Schema(format = "email")
+    private String contactEmail;
+}
+```
+
+Validation errors return 422 Unprocessable Entity:
+
+```json
+{
+  "status": 422,
+  "error": "Unprocessable Entity",
+  "message": "Validation failed",
+  "errors": [
+    {
+      "field": "spec.title",
+      "message": "must not be empty"
+    },
+    {
+      "field": "spec.price",
+      "message": "must be between 0 and 999999"
+    }
+  ]
+}
+```
+
+## Lifecycle Management
+
+### Using Finalizers
+
+Prevent deletion until cleanup is complete:
+
+```java
+import run.halo.app.extension.controller.Controller;
+import run.halo.app.extension.controller.Reconciler;
+
+@Component
+public class BookReconciler implements Reconciler<BookReconciler.Request> {
+    
+    private static final String FINALIZER_NAME = "book.example.halo.run/cleanup";
+    
+    @Override
+    public Result reconcile(Request request) {
+        return client.fetch(Book.class, request.name())
+            .flatMap(book -> {
+                if (book.getMetadata().getDeletionTimestamp() != null) {
+                    // Book is being deleted
+                    return cleanupBook(book)
+                        .then(removeFinalizer(book));
+                } else {
+                    // Ensure finalizer is present
+                    return addFinalizerIfNeeded(book);
+                }
+            })
+            .retryWhen(Retry.backoff(3, Duration.ofSeconds(1)))
+            .map(book -> new Result(false, null))
+            .defaultIfEmpty(new Result(false, null));
+    }
+    
+    private Mono<Book> addFinalizerIfNeeded(Book book) {
+        var finalizers = book.getMetadata().getFinalizers();
+        if (finalizers != null && finalizers.contains(FINALIZER_NAME)) {
+            return Mono.just(book);
+        }
+        
+        if (finalizers == null) {
+            finalizers = new HashSet<>();
+            book.getMetadata().setFinalizers(finalizers);
+        }
+        finalizers.add(FINALIZER_NAME);
+        return client.update(book);
+    }
+    
+    private Mono<Void> cleanupBook(Book book) {
+        // Perform cleanup (delete related resources, notify services, etc.)
+        return Mono.empty();
+    }
+    
+    private Mono<Book> removeFinalizer(Book book) {
+        var finalizers = book.getMetadata().getFinalizers();
+        if (finalizers != null) {
+            finalizers.remove(FINALIZER_NAME);
+            return client.update(book);
+        }
+        return Mono.just(book);
+    }
+}
+```
+
+### Watch for Changes
+
+React to extension changes in real-time:
+
+```java
+import run.halo.app.extension.ReactiveExtensionClient;
+import run.halo.app.extension.Watcher;
+
+@Component
+public class BookWatcher {
+    
+    private final ReactiveExtensionClient client;
+    
+    @PostConstruct
+    public void watchBooks() {
+        client.watch(Book.class)
+            .subscribe(event -> {
+                switch (event.getType()) {
+                    case ADDED:
+                        System.out.println("New book added: " + event.getObject().getMetadata().getName());
+                        break;
+                    case MODIFIED:
+                        System.out.println("Book updated: " + event.getObject().getMetadata().getName());
+                        break;
+                    case DELETED:
+                        System.out.println("Book deleted: " + event.getObject().getMetadata().getName());
+                        break;
+                }
+            });
+    }
+}
+```
+
+## Best Practices
+
+### Naming Conventions
+
+1. **Group names**: Use reverse-DNS notation (e.g., `example.halo.run`, `mycompany.halo.run`)
+2. **Kind names**: Use singular, PascalCase (e.g., `Book`, `Order`, `ShoppingCart`)
+3. **Plural names**: Use lowercase (e.g., `books`, `orders`, `shoppingcarts`)
+4. **Resource names**: Use lowercase with hyphens (e.g., `effective-java`, `order-12345`)
+
+### API Versioning
+
+- Start with `v1alpha1` for experimental APIs
+- Progress to `v1beta1` when API is stable but may change
+- Use `v1` for stable, production-ready APIs
+- Maintain backward compatibility or provide migration paths
+
+### Metadata Usage
+
+**Labels:**
+- Use for filtering and selection
+- Keep values simple (no complex data)
+- Index frequently queried labels
+- Examples: `category=programming`, `featured=true`, `status=active`
+
+**Annotations:**
+- Use for non-identifying metadata
+- Can store complex data (JSON)
+- Not indexed by default
+- Examples: configuration, last sync time, external IDs
+
+### Performance Considerations
+
+1. **Use pagination** for list operations with large result sets
+2. **Index frequently queried fields** using custom indexes
+3. **Use labels** instead of field selectors when possible
+4. **Limit watch usage** to necessary resources only
+5. **Batch operations** when creating/updating multiple resources
+
+## Error Handling
+
+### Common HTTP Status Codes
+
+- **200 OK**: Successful GET, PUT, PATCH
+- **201 Created**: Successful POST
+- **204 No Content**: Successful DELETE
+- **400 Bad Request**: Invalid JSON or missing required fields
+- **401 Unauthorized**: Missing authentication
+- **403 Forbidden**: Insufficient permissions
+- **404 Not Found**: Resource doesn't exist
+- **409 Conflict**: Version mismatch (optimistic locking)
+- **422 Unprocessable Entity**: Validation errors
+- **500 Internal Server Error**: Server-side error
+
+### Handling Version Conflicts
+
+When concurrent updates occur:
+
+```bash
+# First update succeeds
+curl -X PUT '.../books/effective-java' -d '{"metadata":{"version":1},...}'
+# Returns: version 2
+
+# Second update with stale version fails
+curl -X PUT '.../books/effective-java' -d '{"metadata":{"version":1},...}'
+# Returns: 409 Conflict
+```
+
+**Solution:** Fetch latest version and retry:
+
+```java
+public Mono<Book> updateBook(String name, Function<Book, Book> updater) {
+    return client.fetch(Book.class, name)
+        .flatMap(book -> {
+            Book updated = updater.apply(book);
+            return client.update(updated);
+        })
+        .retryWhen(Retry.backoff(3, Duration.ofMillis(100))
+            .filter(throwable -> throwable instanceof OptimisticLockingFailureException));
+}
+```
+
+## Security Considerations
+
+### Permission Model
+
+Extension access is controlled through Halo's RBAC system:
+
+```yaml
+apiVersion: v1alpha1
+kind: Role
+metadata:
+  name: book-admin
+rules:
+  - apiGroups: ["example.halo.run"]
+    resources: ["books"]
+    verbs: ["*"]
+  - apiGroups: ["example.halo.run"]
+    resources: ["books/status"]
+    verbs: ["get", "update"]
+```
+
+### Input Validation
+
+Always validate user input:
+
+- Use schema annotations for basic validation
+- Implement custom validators for complex rules
+- Sanitize data before storage
+- Validate relationships (e.g., referenced resources exist)
+
+### Sensitive Data
+
+For sensitive information:
+
+- Use `Secret` resources instead of storing in extension fields
+- Reference secrets by name in your extension
+- Never expose sensitive data in status fields
+- Use annotations for internal metadata only
+
+## Next Steps
+
+- [Core Extensions](/api/extension/core-extensions) - Learn about built-in extension types
+- [Extension System Overview](/developer/extension/overview) - Architecture deep dive
+- [Creating Custom Models](/developer/extension/custom-models) - Advanced extension development
+- [Writing Reconcilers](/developer/extension/reconciler) - Implement business logic with controllers

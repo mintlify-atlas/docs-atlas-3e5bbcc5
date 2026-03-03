@@ -1,0 +1,522 @@
+---
+title: Caching Strategies
+description: Learn how to leverage caching in Halo CMS for improved performance
+---
+
+Caching is essential for improving performance in content management systems. Halo provides a flexible caching framework built on Spring's caching abstraction, allowing you to cache rendered pages and data with minimal configuration.
+
+## Overview
+
+Halo uses Spring Framework's Caching abstraction, which provides a unified interface for various cache implementations. This design allows you to switch cache providers with minimal code changes.
+
+**Benefits:**
+
+- Reduce database queries for frequently accessed data
+- Improve page load times for static or semi-static content
+- Lower server resource usage
+- Easy provider switching (in-memory, Redis, etc.)
+
+## Cache Configuration
+
+Halo provides `CacheProperties` for enabling/disabling caches:
+
+```yaml
+halo:
+  caches:
+    page:
+      disabled: false  # Enable page caching
+    others:
+      disabled: false  # Enable other caches
+```
+
+**Configuration Location:** `application.yaml` or `application.properties`
+
+### Disabling Caches
+
+For development or debugging, you may want to disable caching:
+
+```yaml
+halo:
+  caches:
+    page:
+      disabled: true   # Disable page caching
+    others:
+      disabled: true   # Disable other caches
+```
+
+<Warning>
+Disabling caches in production environments will significantly impact performance. Only disable caches for debugging purposes.
+</Warning>
+
+## Page Caching
+
+Page caching stores rendered HTML pages to avoid repeated template rendering.
+
+### Page Cache Rules
+
+Pages are cached only when ALL conditions are met:
+
+1. Request method is `GET`
+2. Response status is `HTTP 200 (OK)`
+3. Content-Type is `text/html`
+4. Content is rendered by template engine
+
+### Page Cache Configuration
+
+| Property        | Value                              |
+|-----------------|------------------------------------|
+| Cache Name      | `page`                             |
+| Eviction Policy | Time-based (since last access)     |
+| TTL             | 1 hour from last access            |
+| Maximum Entries | 10,000 entries                     |
+
+<Info>
+Page cache uses an LRU (Least Recently Used) eviction policy when the maximum number of entries is reached.
+</Info>
+
+### Example: Cached Pages
+
+The following pages are typically cached:
+
+```bash
+# Homepage
+GET https://example.com/
+
+# Post detail pages
+GET https://example.com/posts/hello-world
+
+# Category pages
+GET https://example.com/categories/technology
+
+# Tag pages
+GET https://example.com/tags/tutorial
+
+# Archive pages
+GET https://example.com/archives/2024/03
+```
+
+### Pages NOT Cached
+
+These requests are NOT cached:
+
+```bash
+# POST requests
+POST https://example.com/api/posts
+
+# API responses (JSON)
+GET https://example.com/api/v1alpha1/posts
+
+# Error pages
+GET https://example.com/non-existent-page  # 404
+
+# Admin console
+GET https://example.com/console/*
+```
+
+## Custom Caching in Plugins
+
+You can use Spring's caching annotations in your plugins:
+
+### Using @Cacheable
+
+Cache method results:
+
+```java
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+@Service
+public class ProductService {
+    
+    private final ReactiveExtensionClient client;
+    
+    public ProductService(ReactiveExtensionClient client) {
+        this.client = client;
+    }
+    
+    @Cacheable(value = "products", key = "#name")
+    public Mono<Product> getProduct(String name) {
+        return client.fetch(Product.class, name);
+    }
+    
+    @Cacheable(value = "product-list", key = "#category")
+    public Flux<Product> getProductsByCategory(String category) {
+        return client.list(Product.class, 
+            product -> category.equals(product.getSpec().getCategory()),
+            null
+        );
+    }
+}
+```
+
+### Using @CachePut
+
+Update cache entries:
+
+```java
+import org.springframework.cache.annotation.CachePut;
+
+@Service
+public class ProductService {
+    
+    @CachePut(value = "products", key = "#product.metadata.name")
+    public Mono<Product> updateProduct(Product product) {
+        return client.update(product);
+    }
+}
+```
+
+### Using @CacheEvict
+
+Remove cache entries:
+
+```java
+import org.springframework.cache.annotation.CacheEvict;
+
+@Service
+public class ProductService {
+    
+    @CacheEvict(value = "products", key = "#name")
+    public Mono<Void> deleteProduct(String name) {
+        return client.delete(Product.class, name);
+    }
+    
+    // Clear entire cache
+    @CacheEvict(value = "products", allEntries = true)
+    public Mono<Void> clearAllProducts() {
+        return Mono.empty();
+    }
+}
+```
+
+### Using @Caching
+
+Combine multiple cache operations:
+
+```java
+import org.springframework.cache.annotation.Caching;
+
+@Service
+public class ProductService {
+    
+    @Caching(
+        put = {
+            @CachePut(value = "products", key = "#product.metadata.name")
+        },
+        evict = {
+            @CacheEvict(value = "product-list", allEntries = true),
+            @CacheEvict(value = "featured-products", allEntries = true)
+        }
+    )
+    public Mono<Product> publishProduct(Product product) {
+        product.getSpec().setPublished(true);
+        return client.update(product);
+    }
+}
+```
+
+## Cache Configuration for Plugins
+
+Define custom cache configurations:
+
+```java
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.caffeine.CaffeineCacheManager;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
+@Configuration
+@EnableCaching
+public class CacheConfig {
+    
+    @Bean
+    public CaffeineCacheManager cacheManager() {
+        CaffeineCacheManager cacheManager = new CaffeineCacheManager(
+            "products",
+            "product-list",
+            "featured-products"
+        );
+        
+        cacheManager.setCaffeine(Caffeine.newBuilder()
+            .maximumSize(1000)
+            .expireAfterWrite(Duration.ofMinutes(30))
+            .recordStats()
+        );
+        
+        return cacheManager;
+    }
+}
+```
+
+### Cache with Custom Key Generator
+
+```java
+import org.springframework.cache.interceptor.KeyGenerator;
+import org.springframework.context.annotation.Bean;
+
+@Configuration
+public class CacheConfig {
+    
+    @Bean
+    public KeyGenerator customKeyGenerator() {
+        return (target, method, params) -> {
+            StringBuilder sb = new StringBuilder();
+            sb.append(target.getClass().getSimpleName());
+            sb.append(".");
+            sb.append(method.getName());
+            for (Object param : params) {
+                sb.append(".");
+                sb.append(param.toString());
+            }
+            return sb.toString();
+        };
+    }
+}
+
+@Service
+public class ProductService {
+    
+    @Cacheable(value = "products", keyGenerator = "customKeyGenerator")
+    public Mono<Product> getProduct(String name, String version) {
+        return client.fetch(Product.class, name);
+    }
+}
+```
+
+## Cache Providers
+
+### In-Memory Cache (Default)
+
+Halo uses Caffeine as the default in-memory cache:
+
+```yaml
+spring:
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=10000,expireAfterWrite=3600s
+```
+
+**Pros:**
+- Fast access
+- No external dependencies
+- Simple configuration
+
+**Cons:**
+- Not shared across instances
+- Lost on restart
+- Memory limited
+
+### Redis Cache
+
+For distributed deployments, use Redis:
+
+```yaml
+spring:
+  cache:
+    type: redis
+  redis:
+    host: localhost
+    port: 6379
+    password: yourpassword
+    database: 0
+```
+
+**Configuration Class:**
+
+```java
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.cache.RedisCacheConfiguration;
+import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.RedisSerializationContext;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
+
+@Configuration
+public class RedisCacheConfig {
+    
+    @Bean
+    public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
+        RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
+            .entryTtl(Duration.ofHours(1))
+            .serializeKeysWith(
+                RedisSerializationContext.SerializationPair.fromSerializer(
+                    new StringRedisSerializer()
+                )
+            )
+            .serializeValuesWith(
+                RedisSerializationContext.SerializationPair.fromSerializer(
+                    new GenericJackson2JsonRedisSerializer()
+                )
+            );
+        
+        return RedisCacheManager.builder(connectionFactory)
+            .cacheDefaults(config)
+            .build();
+    }
+}
+```
+
+**Pros:**
+- Shared across instances
+- Persistent (with AOF/RDB)
+- Scalable
+- Support for advanced features
+
+**Cons:**
+- External dependency
+- Network latency
+- More complex setup
+
+<Tip>
+Use Redis cache for production deployments with multiple Halo instances to ensure cache consistency.
+</Tip>
+
+## Cache Invalidation Strategies
+
+### Time-Based Expiration
+
+```java
+@Cacheable(value = "posts", key = "#name")
+public Mono<Post> getPost(String name) {
+    return client.fetch(Post.class, name);
+}
+```
+
+With configuration:
+```yaml
+spring:
+  cache:
+    caffeine:
+      spec: expireAfterWrite=1h
+```
+
+### Event-Based Invalidation
+
+```java
+import org.springframework.context.event.EventListener;
+import org.springframework.cache.annotation.CacheEvict;
+import run.halo.app.event.post.PostUpdatedEvent;
+
+@Component
+public class PostCacheInvalidator {
+    
+    @EventListener(PostUpdatedEvent.class)
+    @CacheEvict(value = "posts", key = "#event.postName")
+    public void onPostUpdated(PostUpdatedEvent event) {
+        // Cache automatically evicted
+    }
+    
+    @EventListener(PostUpdatedEvent.class)
+    @CacheEvict(value = "post-list", allEntries = true)
+    public void onPostListChanged(PostUpdatedEvent event) {
+        // Clear entire post list cache
+    }
+}
+```
+
+### Manual Invalidation
+
+```java
+import org.springframework.cache.CacheManager;
+
+@Service
+public class CacheService {
+    
+    private final CacheManager cacheManager;
+    
+    public void clearCache(String cacheName) {
+        Cache cache = cacheManager.getCache(cacheName);
+        if (cache != null) {
+            cache.clear();
+        }
+    }
+    
+    public void evictCacheEntry(String cacheName, Object key) {
+        Cache cache = cacheManager.getCache(cacheName);
+        if (cache != null) {
+            cache.evict(key);
+        }
+    }
+}
+```
+
+## Monitoring Cache Performance
+
+### Enable Statistics
+
+```java
+@Bean
+public CaffeineCacheManager cacheManager() {
+    CaffeineCacheManager manager = new CaffeineCacheManager();
+    manager.setCaffeine(Caffeine.newBuilder()
+        .maximumSize(1000)
+        .expireAfterWrite(Duration.ofMinutes(30))
+        .recordStats()  // Enable statistics
+    );
+    return manager;
+}
+```
+
+### Access Cache Statistics
+
+```java
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.stats.CacheStats;
+
+@Service
+public class CacheMonitorService {
+    
+    private final CacheManager cacheManager;
+    
+    public CacheStats getCacheStats(String cacheName) {
+        var cache = cacheManager.getCache(cacheName);
+        if (cache instanceof CaffeineCache caffeineCache) {
+            Cache<Object, Object> nativeCache = caffeineCache.getNativeCache();
+            return nativeCache.stats();
+        }
+        return null;
+    }
+    
+    public Map<String, Object> getCacheMetrics(String cacheName) {
+        CacheStats stats = getCacheStats(cacheName);
+        if (stats == null) {
+            return Map.of();
+        }
+        
+        return Map.of(
+            "hitCount", stats.hitCount(),
+            "missCount", stats.missCount(),
+            "hitRate", stats.hitRate(),
+            "evictionCount", stats.evictionCount(),
+            "loadSuccessCount", stats.loadSuccessCount(),
+            "loadFailureCount", stats.loadFailureCount()
+        );
+    }
+}
+```
+
+## Best Practices
+
+1. **Cache Appropriate Data**: Cache data that is expensive to compute or fetch
+2. **Set TTL Values**: Always set appropriate time-to-live values
+3. **Monitor Hit Rates**: Track cache hit rates to optimize cache strategy
+4. **Use Cache Keys Wisely**: Design cache keys to avoid collisions
+5. **Handle Cache Failures**: Implement fallback when cache is unavailable
+6. **Clear Stale Data**: Implement proper invalidation strategies
+7. **Size Limitations**: Set maximum cache sizes to prevent memory issues
+8. **Test Without Cache**: Ensure application works when cache is disabled
+
+<Note>
+Cache should improve performance, not correctness. Your application must work correctly even when caching is disabled.
+</Note>
+
+## Related Resources
+
+- [Plugin Development](/developer/plugin/basics)
+- [Performance Optimization](/developer/best-practices/performance)
+- [Spring Cache Documentation](https://docs.spring.io/spring-framework/reference/integration/cache.html)

@@ -1,0 +1,303 @@
+---
+title: Theme Management APIs
+description: Install, configure, activate and manage themes in Halo CMS
+---
+
+The Theme Management APIs allow you to manage themes in Halo CMS, including installation, activation, configuration, and upgrades.
+
+## Theme Listing
+
+### List Themes
+
+Retrieve a list of themes with optional filtering.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/themes?page=0&size=20" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField query="page" type="integer" default="0">
+  Page number. Default is 0.
+</ParamField>
+
+<ParamField query="size" type="integer" default="0">
+  Size number. Default is 0.
+</ParamField>
+
+<ParamField query="uninstalled" type="boolean">
+  Whether to list uninstalled themes
+</ParamField>
+
+<ParamField query="labelSelector" type="array">
+  Label selector. e.g.: hidden!=true
+</ParamField>
+
+<ParamField query="fieldSelector" type="array">
+  Field selector. e.g.: metadata.name==halo
+</ParamField>
+
+<ResponseField name="items" type="array">
+  Array of theme objects
+</ResponseField>
+
+<ResponseField name="page" type="integer">
+  Current page number
+</ResponseField>
+
+<ResponseField name="size" type="integer">
+  Size of each page
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of themes
+</ResponseField>
+
+<ResponseField name="totalPages" type="integer">
+  Total number of pages
+</ResponseField>
+
+### Fetch Activated Theme
+
+Retrieve the currently activated theme.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/themes/-/activation" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ResponseField name="theme" type="object">
+  The currently activated theme object
+</ResponseField>
+
+<ResponseField name="metadata.name" type="string">
+  Theme identifier
+</ResponseField>
+
+<ResponseField name="spec.displayName" type="string">
+  Display name of the theme
+</ResponseField>
+
+<ResponseField name="spec.version" type="string">
+  Theme version
+</ResponseField>
+
+## Theme Installation
+
+### Install Theme (File Upload)
+
+Install a theme by uploading a ZIP file.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/themes/install" \
+  -H "Authorization: Bearer {token}" \
+  -F "file=@/path/to/theme.zip"
+```
+
+<ResponseField name="theme" type="object">
+  The installed theme object
+</ResponseField>
+
+<ResponseField name="metadata.name" type="string">
+  Theme identifier
+</ResponseField>
+
+<ResponseField name="spec.displayName" type="string">
+  Display name of the theme
+</ResponseField>
+
+<ResponseField name="spec.version" type="string">
+  Theme version
+</ResponseField>
+
+<ResponseField name="spec.author" type="object">
+  Theme author information
+</ResponseField>
+
+### Install Theme from URI
+
+Install a theme from a remote URL.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/themes/-/install-from-uri" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "uri": "https://example.com/themes/my-theme.zip"
+  }'
+```
+
+<ParamField body="uri" type="string" required>
+  URL of the theme ZIP file to install
+</ParamField>
+
+<ResponseField name="theme" type="object">
+  The installed theme object
+</ResponseField>
+
+## Theme Activation
+
+### Activate Theme
+
+Activate a theme by name.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/themes/{name}/activation" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  Theme name to activate
+</ParamField>
+
+<ResponseField name="theme" type="object">
+  The activated theme object
+</ResponseField>
+
+## Theme Configuration
+
+### Fetch Theme Setting
+
+Retrieve the setting schema for a theme.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/themes/{name}/setting" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  Theme name
+</ParamField>
+
+<ResponseField name="setting" type="object">
+  The theme setting schema
+</ResponseField>
+
+### Fetch Theme Config
+
+Retrieve the current configuration values for a theme.
+
+```bash
+curl -X GET "http://localhost:8091/apis/api.console.halo.run/v1alpha1/themes/{name}/json-config" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  Theme name
+</ParamField>
+
+<ResponseField name="config" type="object">
+  JSON configuration object for the theme
+</ResponseField>
+
+### Update Theme Config
+
+Update the configuration of a theme.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/themes/{name}/json-config" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "primaryColor": "#007bff",
+    "layout": "grid",
+    "showSidebar": true
+  }'
+```
+
+<ParamField path="name" type="string" required>
+  Theme name
+</ParamField>
+
+<ParamField body="config" type="object" required>
+  Configuration object with key-value pairs
+</ParamField>
+
+### Reset Theme Config
+
+Reset the theme configuration to default values.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/themes/{name}/reset-config" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  Theme name
+</ParamField>
+
+<ResponseField name="configMap" type="object">
+  The reset configuration object
+</ResponseField>
+
+## Theme Operations
+
+### Reload Theme
+
+Reload theme settings.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/themes/{name}/reload" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  Theme name to reload
+</ParamField>
+
+<ResponseField name="theme" type="object">
+  The reloaded theme object
+</ResponseField>
+
+### Invalidate Theme Cache
+
+Invalidate the theme template cache.
+
+```bash
+curl -X PUT "http://localhost:8091/apis/api.console.halo.run/v1alpha1/themes/{name}/invalidate-cache" \
+  -H "Authorization: Bearer {token}"
+```
+
+<ParamField path="name" type="string" required>
+  Theme name
+</ParamField>
+
+## Theme Upgrades
+
+### Upgrade Theme (File Upload)
+
+Upgrade a theme by uploading a new ZIP file.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/themes/{name}/upgrade" \
+  -H "Authorization: Bearer {token}" \
+  -F "file=@/path/to/theme-v2.zip"
+```
+
+<ParamField path="name" type="string" required>
+  Theme name to upgrade
+</ParamField>
+
+### Upgrade Theme from URI
+
+Upgrade a theme from a remote URL.
+
+```bash
+curl -X POST "http://localhost:8091/apis/api.console.halo.run/v1alpha1/themes/{name}/upgrade-from-uri" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "uri": "https://example.com/themes/my-theme-v2.zip"
+  }'
+```
+
+<ParamField path="name" type="string" required>
+  Theme name to upgrade
+</ParamField>
+
+<ParamField body="uri" type="string" required>
+  URL of the new theme version ZIP file
+</ParamField>
+
+<ResponseField name="theme" type="object">
+  The upgraded theme object
+</ResponseField>

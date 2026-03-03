@@ -1,0 +1,290 @@
+---
+title: Comment management
+description: Learn how to manage comments and replies on your posts and pages in Halo CMS.
+---
+
+Comments allow readers to engage with your content and create discussions on your blog. Halo provides tools to moderate, manage, and respond to comments effectively.
+
+## Understanding comments in Halo
+
+Comments in Halo support:
+
+- **Comments on posts**: Readers can comment on blog posts
+- **Comments on pages**: Readers can comment on standalone pages (if enabled)
+- **Threaded replies**: Conversations can branch into reply threads
+- **Comment moderation**: Approve or hide comments before they appear publicly
+- **Anonymous and authenticated comments**: Support for both guest commenters and logged-in users
+
+<Info>
+  Each post and page has independent comment settings. You can enable comments globally and then disable them for specific content pieces.
+</Info>
+
+## Enabling comments
+
+### For individual posts or pages
+
+<Steps>
+  <Step title="Open the editor">
+    Open the post or page editor for the content where you want to enable comments.
+  </Step>
+  
+  <Step title="Access settings">
+    Click the **Settings** tab in the editor.
+  </Step>
+  
+  <Step title="Enable comments">
+    Toggle the **Allow Comments** option to enable comments for this content.
+  </Step>
+  
+  <Step title="Save changes">
+    Click **Save** or **Update** to apply the setting.
+  </Step>
+</Steps>
+
+### Global comment settings
+
+To configure default comment behavior for your entire site:
+
+<Steps>
+  <Step title="Navigate to settings">
+    From the admin dashboard, click on **Settings** in the sidebar.
+  </Step>
+  
+  <Step title="Access comment settings">
+    Find and click on the **Comments** or **Discussion** settings section.
+  </Step>
+  
+  <Step title="Configure options">
+    Adjust global settings such as:
+    - Default comment status for new posts
+    - Comment moderation requirements
+    - Anonymous comment permissions
+    - Email notification preferences
+  </Step>
+  
+  <Step title="Save settings">
+    Click **Save** to apply your changes.
+  </Step>
+</Steps>
+
+## Viewing comments
+
+To access and review all comments on your site:
+
+<Steps>
+  <Step title="Navigate to comments">
+    From the admin dashboard, click on **Comments** in the sidebar.
+  </Step>
+  
+  <Step title="View comment list">
+    The comments page displays all comments across your site, showing:
+    - Commenter name and avatar
+    - Comment content (preview)
+    - Associated post or page
+    - Comment status (approved, pending, hidden)
+    - Timestamp and reply count
+  </Step>
+  
+  <Step title="Filter comments">
+    Use the filter options to view:
+    - All comments
+    - Pending approval
+    - Approved comments
+    - Hidden comments
+    - Comments by post or page
+  </Step>
+</Steps>
+
+<Note>
+  The comment list shows badges indicating unread replies. Click on a comment to mark replies as read.
+</Note>
+
+## Moderating comments
+
+### Approving comments
+
+If you require comment approval before publication:
+
+<Steps>
+  <Step title="View pending comments">
+    Navigate to **Comments** and filter by **Pending Approval**.
+  </Step>
+  
+  <Step title="Review the comment">
+    Click on the comment to read the full content and see the commenter's details.
+  </Step>
+  
+  <Step title="Approve or reject">
+    Click the **Approve** button to publish the comment, or click **Hide** to prevent it from appearing publicly.
+  </Step>
+</Steps>
+
+### Hiding comments
+
+To hide inappropriate or spam comments without deleting them:
+
+<Steps>
+  <Step title="Find the comment">
+    Navigate to **Comments** and locate the comment you want to hide.
+  </Step>
+  
+  <Step title="Hide the comment">
+    Click the **Hide** button (eye icon) next to the comment. The comment will be hidden from public view but remains in your system.
+  </Step>
+</Steps>
+
+<Tip>
+  Hidden comments can be restored later if needed. This is useful for temporarily removing content while investigating issues.
+</Tip>
+
+### Deleting comments
+
+To permanently remove a comment:
+
+<Steps>
+  <Step title="Locate the comment">
+    Navigate to **Comments** and find the comment you want to delete.
+  </Step>
+  
+  <Step title="Delete the comment">
+    Click the **Delete** button (trash icon) next to the comment.
+  </Step>
+  
+  <Step title="Confirm deletion">
+    Confirm the action when prompted. The comment and all its replies will be permanently removed.
+  </Step>
+</Steps>
+
+<Warning>
+  Deleting a comment also deletes all replies to that comment. This action cannot be undone. Consider hiding comments instead if you might need to restore them later.
+</Warning>
+
+## Managing replies
+
+Replies are responses to comments that create threaded conversations.
+
+### Viewing replies
+
+<Steps>
+  <Step title="Click on comment">
+    In the comments list, click on any comment to view its details and replies.
+  </Step>
+  
+  <Step title="Review reply thread">
+    The comment detail view shows all replies in chronological order, with:
+    - Reply author and timestamp
+    - Reply content
+    - Approval status
+  </Step>
+</Steps>
+
+### Replying to comments
+
+To respond to a comment as an administrator:
+
+<Steps>
+  <Step title="Open comment detail">
+    Navigate to **Comments** and click on the comment you want to reply to.
+  </Step>
+  
+  <Step title="Write your reply">
+    In the reply section at the bottom, type your response.
+  </Step>
+  
+  <Step title="Submit reply">
+    Click **Reply** to post your response. It will appear in the reply thread.
+  </Step>
+</Steps>
+
+### Moderating replies
+
+Replies can be moderated independently from their parent comments:
+
+<Steps>
+  <Step title="View reply">
+    Open the comment detail page to see all replies.
+  </Step>
+  
+  <Step title="Approve, hide, or delete">
+    Use the action buttons next to each reply to:
+    - Approve pending replies
+    - Hide inappropriate replies
+    - Delete spam or unwanted replies
+  </Step>
+</Steps>
+
+## Understanding comment statuses
+
+Comments in Halo can have several statuses:
+
+- **Approved**: The comment is visible to all site visitors
+- **Hidden**: The comment is hidden from public view but remains in the system
+- **Pending**: The comment is awaiting moderator approval before appearing publicly
+- **Priority/Pinned**: The comment is marked to appear prominently (higher priority number appears first)
+
+## Comment notifications
+
+Halo can send notifications when comments are posted:
+
+### For comment authors
+
+When someone replies to their comment, the original commenter can receive an email notification if they opted in during commenting.
+
+### For administrators
+
+You can receive notifications for:
+- New comments awaiting approval
+- New replies to comments you're watching
+- Comments on specific posts or pages
+
+Configure notification settings in **Settings** > **Comments**.
+
+<Note>
+  Comment notifications require proper email configuration in your Halo installation. Check with your system administrator if notifications aren't working.
+</Note>
+
+## Pinning and prioritizing comments
+
+To highlight important comments:
+
+<Steps>
+  <Step title="Open comment detail">
+    Navigate to **Comments** and click on the comment you want to prioritize.
+  </Step>
+  
+  <Step title="Enable pinning">
+    Toggle the **Pin Comment** option to keep it at the top.
+  </Step>
+  
+  <Step title="Set priority">
+    Adjust the **Priority** value. Higher numbers appear first in the comment list.
+  </Step>
+  
+  <Step title="Save changes">
+    Click **Save** to apply the changes.
+  </Step>
+</Steps>
+
+## Comment owner information
+
+Comments can be posted by:
+
+- **Registered users**: Authenticated users with Halo accounts. Their username and avatar are automatically linked.
+- **Email commenters**: Anonymous visitors who provide a name and email address. Their comments are marked with a "Email" kind indicator.
+
+Comment owner details include:
+- **Display Name**: The name shown publicly
+- **Email**: The commenter's email address (stored but not displayed publicly)
+- **Website**: Optional website URL
+- **Avatar**: Profile picture (Gravatar for email commenters)
+- **IP Address**: Stored for moderation purposes
+- **User Agent**: Browser and device information
+
+## Best practices for comment moderation
+
+- **Respond promptly**: Engage with commenters to foster community and discussion
+- **Set clear guidelines**: Establish and publish comment guidelines for your site
+- **Use moderation consistently**: Apply the same standards to all comments
+- **Watch for spam**: Regularly review and remove spam comments
+- **Enable approval for new commenters**: Require first-time commenters to be approved
+- **Monitor regularly**: Check your comment queue daily to maintain active discussions

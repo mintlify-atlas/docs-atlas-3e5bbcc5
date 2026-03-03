@@ -1,0 +1,236 @@
+---
+title: 'API Overview'
+description: 'Complete guide to the Halo CMS REST API architecture, versioning, and API groups'
+---
+
+## Introduction
+
+The Halo CMS API is a comprehensive REST API that provides programmatic access to all aspects of your Halo instance. It follows RESTful principles and returns JSON responses, making it easy to integrate with any programming language or framework.
+
+## API Architecture
+
+Halo's API is organized into four distinct groups, each serving different purposes:
+
+### Public API
+
+The Public API provides read-only access to publicly available content. This API is designed for building front-end applications, mobile apps, and integrations that need to display your site's content.
+
+**Base Path:** `/apis/api.content.halo.run/v1alpha1`
+
+**Use Cases:**
+- Fetching published posts and pages
+- Retrieving categories and tags
+- Loading comments
+- Building custom front-end themes
+
+**Authentication:** Optional for public content, required for user-specific data
+
+### Console API
+
+The Console API provides full administrative access to your Halo instance. This is the same API used by the Halo admin dashboard for content management, user administration, and system configuration.
+
+**Base Path:** `/apis/api.console.halo.run/v1alpha1`
+
+**Use Cases:**
+- Content creation and management
+- User and role administration
+- Plugin and theme management
+- System configuration
+- Attachment management
+
+**Authentication:** Required (admin privileges needed for most endpoints)
+
+### User Center API (UC)
+
+The User Center API provides user-specific functionality, allowing authenticated users to manage their profile, notifications, and personal settings.
+
+**Base Path:** `/apis/api.notification.halo.run/v1alpha1`
+
+**Use Cases:**
+- Managing user profiles
+- Handling notification preferences
+- User-specific settings
+- Personal content management
+
+**Authentication:** Required (user must be authenticated)
+
+### Extension API
+
+The Extension API provides access to custom resources and endpoints defined by Halo extensions and plugins. This API allows developers to extend Halo's functionality with custom data models and business logic.
+
+**Base Path:** `/api/v1alpha1`
+
+**Use Cases:**
+- Accessing custom extension resources
+- Managing plugin-specific data
+- Custom business logic endpoints
+- Extension configuration
+
+**Authentication:** Required (permissions vary by extension)
+
+## API Versioning
+
+Halo uses API versioning to ensure backward compatibility and smooth upgrades. The current API version is **v1alpha1**.
+
+### Version Format
+
+API versions follow the Kubernetes-style versioning scheme:
+
+- **v1alpha1** - Alpha release, may have breaking changes
+- **v1beta1** - Beta release, more stable but may have minor changes
+- **v1** - Stable release, backward compatible
+
+<Warning>
+The current **v1alpha1** API is in alpha stage. While we strive to maintain compatibility, breaking changes may occur in future releases. Always check the changelog when upgrading.
+</Warning>
+
+### Version in URLs
+
+The API version is included in the URL path:
+
+```
+/api/v1alpha1/resource
+/apis/api.content.halo.run/v1alpha1/resource
+```
+
+## Base URLs
+
+All API requests are made to your Halo instance URL. The base URL format is:
+
+```
+http(s)://your-halo-instance.com
+```
+
+**Development:**
+```
+http://localhost:8091
+```
+
+**Production Example:**
+```
+https://blog.example.com
+```
+
+<Note>
+The default port for Halo is **8091** when running in development mode. In production, you'll typically use a reverse proxy (like Nginx) on standard HTTP/HTTPS ports.
+</Note>
+
+## Request and Response Format
+
+### Request Format
+
+All API requests should:
+
+- Use the appropriate HTTP method (GET, POST, PUT, DELETE, PATCH)
+- Include proper authentication headers
+- Send JSON payloads for POST/PUT/PATCH requests
+- Set `Content-Type: application/json` header for requests with body
+
+### Response Format
+
+All API responses are returned in JSON format:
+
+```json
+{
+  "page": 1,
+  "size": 20,
+  "total": 100,
+  "items": [
+    {
+      "metadata": {
+        "name": "post-1",
+        "creationTimestamp": "2024-01-01T00:00:00Z"
+      },
+      "spec": {
+        "title": "My First Post",
+        "slug": "my-first-post"
+      }
+    }
+  ]
+}
+```
+
+### Common Query Parameters
+
+Most list endpoints support the following query parameters:
+
+<ParamField query="page" type="integer" default="0">
+  Page number for pagination (zero-based)
+</ParamField>
+
+<ParamField query="size" type="integer" default="20">
+  Number of items per page
+</ParamField>
+
+<ParamField query="sort" type="array">
+  Sorting criteria in the format: `property,(asc|desc)`. Multiple sort criteria are supported.
+  
+  Example: `?sort=metadata.creationTimestamp,desc`
+</ParamField>
+
+<ParamField query="labelSelector" type="array">
+  Label selector for filtering resources. Uses Kubernetes-style label selectors.
+  
+  Example: `?labelSelector=hidden!=true`
+</ParamField>
+
+<ParamField query="fieldSelector" type="array">
+  Field selector for filtering by field values.
+  
+  Example: `?fieldSelector=metadata.name==halo`
+</ParamField>
+
+## Error Handling
+
+The API uses standard HTTP status codes to indicate success or failure:
+
+| Status Code | Description |
+|-------------|-------------|
+| 200 | Success |
+| 201 | Created |
+| 204 | No Content (successful deletion) |
+| 400 | Bad Request (invalid parameters) |
+| 401 | Unauthorized (missing or invalid authentication) |
+| 403 | Forbidden (insufficient permissions) |
+| 404 | Not Found |
+| 409 | Conflict (resource already exists) |
+| 500 | Internal Server Error |
+
+### Error Response Format
+
+```json
+{
+  "status": 400,
+  "error": "Bad Request",
+  "message": "Invalid parameter value",
+  "path": "/api/v1alpha1/posts",
+  "timestamp": "2024-01-01T00:00:00Z"
+}
+```
+
+## Rate Limiting
+
+<Info>
+Halo does not enforce rate limiting by default. However, you may configure rate limiting at the reverse proxy level (Nginx, Cloudflare, etc.) to protect your instance from abuse.
+</Info>
+
+## CORS Support
+
+Halo supports Cross-Origin Resource Sharing (CORS) for browser-based applications. Configure CORS settings in your Halo configuration file to specify allowed origins.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    Learn how to authenticate your API requests
+  </Card>
+  <Card title="Public APIs" icon="globe" href="/api/public/posts">
+    Explore public content APIs
+  </Card>
+  <Card title="Console APIs" icon="terminal" href="/api/console/content-management">
+    Manage your Halo instance programmatically
+  </Card>
+  <Card title="Extension APIs" icon="puzzle-piece" href="/api/extension/core-extensions">
+    Access custom extension endpoints
+  </Card>
+</CardGroup>

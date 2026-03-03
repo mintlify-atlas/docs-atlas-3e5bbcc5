@@ -1,0 +1,216 @@
+---
+title: Pages API
+description: Public API endpoints for managing and retrieving single pages
+---
+
+The Pages API provides endpoints to list and retrieve single pages (standalone content pages) in your Halo CMS.
+
+## List Single Pages
+
+Retrieves a paginated list of published single pages.
+
+<CodeGroup>
+```bash cURL
+curl -X GET "http://localhost:8091/apis/api.content.halo.run/v1alpha1/singlepages?page=0&size=10" \
+  -H "Accept: application/json"
+```
+</CodeGroup>
+
+### Query Parameters
+
+<ParamField query="page" type="integer" default="0">
+  Page number. Default is 0.
+</ParamField>
+
+<ParamField query="size" type="integer" default="0">
+  Size number. Default is 0.
+</ParamField>
+
+<ParamField query="labelSelector" type="array">
+  Label selector. e.g.: `hidden!=true`
+</ParamField>
+
+<ParamField query="fieldSelector" type="array">
+  Field selector. e.g.: `metadata.name==halo`
+</ParamField>
+
+<ParamField query="sort" type="array">
+  Sorting criteria in the format: `property,(asc|desc)`. Default sort order is ascending. Multiple sort criteria are supported.
+</ParamField>
+
+### Response
+
+Returns a `ListedSinglePageVoList` object containing paginated page results.
+
+<ResponseField name="items" type="array">
+  Array of single page objects.
+  
+  <ResponseField name="metadata" type="Metadata" required>
+    Page metadata including name, labels, and timestamps.
+  </ResponseField>
+  
+  <ResponseField name="spec" type="SinglePageSpec">
+    Page specification.
+    
+    <ResponseField name="title" type="string" required>
+      Page title.
+    </ResponseField>
+    
+    <ResponseField name="slug" type="string" required>
+      Page slug for URL.
+    </ResponseField>
+    
+    <ResponseField name="cover" type="string">
+      Cover image URL.
+    </ResponseField>
+    
+    <ResponseField name="allowComment" type="boolean" default="true">
+      Whether comments are allowed.
+    </ResponseField>
+    
+    <ResponseField name="pinned" type="boolean" default="false">
+      Whether the page is pinned.
+    </ResponseField>
+    
+    <ResponseField name="priority" type="integer" default="0">
+      Page priority for ordering.
+    </ResponseField>
+    
+    <ResponseField name="visible" type="string" default="PUBLIC">
+      Visibility setting: `PUBLIC`, `INTERNAL`, or `PRIVATE`.
+    </ResponseField>
+    
+    <ResponseField name="publishTime" type="string" format="date-time">
+      Publication timestamp.
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="status" type="SinglePageStatus">
+    Page status information.
+    
+    <ResponseField name="permalink" type="string">
+      Permanent link to the page.
+    </ResponseField>
+    
+    <ResponseField name="excerpt" type="string">
+      Page excerpt.
+    </ResponseField>
+    
+    <ResponseField name="commentsCount" type="integer">
+      Number of comments.
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="stats" type="StatsVo">
+    Page statistics.
+    
+    <ResponseField name="visit" type="integer">
+      Number of visits.
+    </ResponseField>
+    
+    <ResponseField name="upvote" type="integer">
+      Number of upvotes.
+    </ResponseField>
+    
+    <ResponseField name="comment" type="integer">
+      Number of comments.
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="owner" type="ContributorVo">
+    Page owner information.
+  </ResponseField>
+  
+  <ResponseField name="contributors" type="array">
+    Array of contributor objects.
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="page" type="integer">
+  Current page number, starts from 1.
+</ResponseField>
+
+<ResponseField name="size" type="integer">
+  Size of each page.
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of single pages.
+</ResponseField>
+
+<ResponseField name="totalPages" type="integer">
+  Total number of pages.
+</ResponseField>
+
+<ResponseField name="first" type="boolean">
+  Whether this is the first page.
+</ResponseField>
+
+<ResponseField name="last" type="boolean">
+  Whether this is the last page.
+</ResponseField>
+
+<ResponseField name="hasNext" type="boolean">
+  Whether there is a next page.
+</ResponseField>
+
+<ResponseField name="hasPrevious" type="boolean">
+  Whether there is a previous page.
+</ResponseField>
+
+## Get Single Page by Name
+
+Retrieves a single page by its name.
+
+<CodeGroup>
+```bash cURL
+curl -X GET "http://localhost:8091/apis/api.content.halo.run/v1alpha1/singlepages/{name}" \
+  -H "Accept: application/json"
+```
+</CodeGroup>
+
+### Path Parameters
+
+<ParamField path="name" type="string" required>
+  SinglePage name (unique identifier).
+</ParamField>
+
+### Response
+
+Returns a `SinglePageVo` object with complete page details including content.
+
+<ResponseField name="metadata" type="Metadata" required>
+  Page metadata.
+</ResponseField>
+
+<ResponseField name="spec" type="SinglePageSpec">
+  Page specification.
+</ResponseField>
+
+<ResponseField name="status" type="SinglePageStatus">
+  Page status.
+</ResponseField>
+
+<ResponseField name="content" type="ContentVo">
+  Page content.
+  
+  <ResponseField name="raw" type="string">
+    Raw content (markdown/HTML).
+  </ResponseField>
+  
+  <ResponseField name="content" type="string">
+    Rendered content.
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="stats" type="StatsVo">
+  Page statistics.
+</ResponseField>
+
+<ResponseField name="owner" type="ContributorVo">
+  Page owner.
+</ResponseField>
+
+<ResponseField name="contributors" type="array">
+  Page contributors.
+</ResponseField>

@@ -1,0 +1,658 @@
+---
+title: Theme Configuration
+description: Configure your Halo theme with theme.yaml and custom settings
+---
+
+## theme.yaml Structure
+
+The `theme.yaml` file is the manifest that defines your theme's metadata and configuration. It follows the Kubernetes-style resource format.
+
+### Complete Example
+
+```yaml title="theme.yaml"
+apiVersion: theme.halo.run/v1alpha1
+kind: Theme
+metadata:
+  name: my-awesome-theme
+spec:
+  displayName: My Awesome Theme
+  author:
+    name: Your Name
+    website: https://yourwebsite.com
+  description: A beautiful and customizable theme for Halo
+  logo: https://example.com/logo.png
+  homepage: https://example.com/theme-homepage
+  repo: https://github.com/username/my-awesome-theme.git
+  issues: https://github.com/username/my-awesome-theme/issues
+  version: 1.0.0
+  requires: ">=2.0.0"
+  license:
+    - name: MIT
+      url: https://opensource.org/licenses/MIT
+  settingName: theme-my-awesome-theme-setting
+  configMapName: theme-my-awesome-theme-configmap
+  customTemplates:
+    post:
+      - name: Photo Gallery
+        description: Template optimized for photo galleries
+        screenshot: /assets/screenshots/photo-gallery.png
+        file: post_photo_gallery.html
+      - name: Wide Layout
+        description: Full-width post layout
+        file: post_wide.html
+    category:
+      - name: Magazine
+        description: Magazine-style category layout
+        file: category_magazine.html
+    page:
+      - name: Landing Page
+        description: Marketing landing page template
+        screenshot: /assets/screenshots/landing.png
+        file: page_landing.html
+```
+
+## Specification Reference
+
+The theme specification is defined in the `Theme` extension:
+
+```java title="api/src/main/java/run/halo/app/core/extension/Theme.java"
+public class ThemeSpec {
+    @Schema(requiredMode = REQUIRED, minLength = 1)
+    private String displayName;
+    
+    @Schema(requiredMode = REQUIRED)
+    private Author author;
+    
+    private String description;
+    private String logo;
+    private String homepage;
+    private String repo;
+    private String issues;
+    private String version = "*";
+    
+    @Schema(requiredMode = NOT_REQUIRED)
+    private String requires = "*";
+    
+    private String settingName;
+    private String configMapName;
+    private List<License> license;
+    
+    @Schema
+    private CustomTemplates customTemplates;
+}
+```
+
+### Required Fields
+
+<AccordionGroup>
+  <Accordion title="apiVersion">
+    The API version for the Theme resource. Must be `theme.halo.run/v1alpha1`.
+    
+    ```yaml
+    apiVersion: theme.halo.run/v1alpha1
+    ```
+  </Accordion>
+
+  <Accordion title="kind">
+    The resource type. Must be `Theme`.
+    
+    ```yaml
+    kind: Theme
+    ```
+  </Accordion>
+
+  <Accordion title="metadata.name">
+    Unique identifier for the theme. Must be unique across all installed themes.
+    
+    ```yaml
+    metadata:
+      name: my-theme
+    ```
+    
+    <Note>
+      Use lowercase letters, numbers, and hyphens only. Should match your theme directory name.
+    </Note>
+  </Accordion>
+
+  <Accordion title="spec.displayName">
+    Human-readable name displayed in the Halo admin interface.
+    
+    ```yaml
+    spec:
+      displayName: My Beautiful Theme
+    ```
+  </Accordion>
+
+  <Accordion title="spec.author">
+    Author information with required `name` field.
+    
+    ```yaml
+    spec:
+      author:
+        name: John Doe
+        website: https://johndoe.com
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Optional Fields
+
+<ParamField path="description" type="string">
+  A brief description of your theme and its features.
+  
+  ```yaml
+  description: A modern, responsive theme with dark mode support
+  ```
+</ParamField>
+
+<ParamField path="logo" type="string">
+  URL to the theme's logo image.
+  
+  ```yaml
+  logo: https://example.com/theme-logo.png
+  ```
+</ParamField>
+
+<ParamField path="homepage" type="string">
+  URL to the theme's homepage or documentation site.
+  
+  ```yaml
+  homepage: https://example.com/themes/my-theme
+  ```
+</ParamField>
+
+<ParamField path="repo" type="string">
+  URL to the theme's Git repository.
+  
+  ```yaml
+  repo: https://github.com/username/my-theme.git
+  ```
+</ParamField>
+
+<ParamField path="issues" type="string">
+  URL to the issue tracker.
+  
+  ```yaml
+  issues: https://github.com/username/my-theme/issues
+  ```
+</ParamField>
+
+<ParamField path="version" type="string" default="*">
+  Theme version following semantic versioning.
+  
+  ```yaml
+  version: 1.2.3
+  ```
+</ParamField>
+
+<ParamField path="requires" type="string" default="*">
+  Minimum Halo version required. Supports version ranges.
+  
+  ```yaml
+  requires: ">=2.0.0"
+  # or
+  requires: "^2.0.0"
+  # or
+  requires: "2.0.0 - 2.5.0"
+  ```
+</ParamField>
+
+<ParamField path="license" type="array">
+  License information for the theme.
+  
+  ```yaml
+  license:
+    - name: MIT
+      url: https://opensource.org/licenses/MIT
+    - name: Apache-2.0
+      url: https://www.apache.org/licenses/LICENSE-2.0
+  ```
+</ParamField>
+
+## Custom Templates
+
+Custom templates allow users to choose different layouts for posts, pages, and categories.
+
+### Template Descriptor Structure
+
+```java title="api/src/main/java/run/halo/app/core/extension/Theme.java"
+public static class TemplateDescriptor {
+    @Schema(requiredMode = REQUIRED, minLength = 1)
+    private String name;
+    
+    private String description;
+    private String screenshot;
+    
+    @Schema(requiredMode = REQUIRED, minLength = 1)
+    private String file;
+}
+```
+
+### Defining Custom Templates
+
+```yaml title="theme.yaml"
+spec:
+  customTemplates:
+    # Post templates
+    post:
+      - name: Photo Gallery
+        description: Optimized layout for photo galleries with lightbox
+        screenshot: /assets/screenshots/photo-gallery.png
+        file: post_photo_gallery.html
+      
+      - name: Video Post
+        description: Template with featured video player
+        screenshot: /assets/screenshots/video-post.png
+        file: post_video.html
+      
+      - name: Minimal
+        description: Clean, distraction-free reading experience
+        file: post_minimal.html
+    
+    # Category templates
+    category:
+      - name: Grid Layout
+        description: Display posts in a responsive grid
+        screenshot: /assets/screenshots/category-grid.png
+        file: category_grid.html
+      
+      - name: Magazine
+        description: Magazine-style layout with featured posts
+        file: category_magazine.html
+    
+    # Page templates
+    page:
+      - name: Landing Page
+        description: Full-width landing page with hero section
+        screenshot: /assets/screenshots/landing.png
+        file: page_landing.html
+      
+      - name: Contact
+        description: Contact page with form
+        file: page_contact.html
+```
+
+<Info>
+  Template files are relative to the `templates/` directory. Screenshots should be in the `templates/assets/` directory.
+</Info>
+
+## Theme Settings
+
+Theme settings allow users to customize your theme without editing code.
+
+### Creating settings.yaml
+
+```yaml title="settings.yaml"
+apiVersion: v1alpha1
+kind: Setting
+metadata:
+  name: theme-my-theme-setting
+spec:
+  forms:
+    - group: basic
+      label: Basic Settings
+      formSchema:
+        - $formkit: select
+          name: layout
+          label: Homepage Layout
+          value: grid
+          options:
+            - label: Grid
+              value: grid
+            - label: List
+              value: list
+            - label: Masonry
+              value: masonry
+        
+        - $formkit: text
+          name: hero_title
+          label: Hero Title
+          value: Welcome to My Site
+        
+        - $formkit: textarea
+          name: hero_subtitle
+          label: Hero Subtitle
+          value: A beautiful site built with Halo
+        
+        - $formkit: code
+          name: custom_css
+          label: Custom CSS
+          language: css
+    
+    - group: colors
+      label: Color Scheme
+      formSchema:
+        - $formkit: color
+          name: primary_color
+          label: Primary Color
+          value: "#007bff"
+        
+        - $formkit: color
+          name: secondary_color
+          label: Secondary Color
+          value: "#6c757d"
+        
+        - $formkit: color
+          name: accent_color
+          label: Accent Color
+          value: "#28a745"
+    
+    - group: social
+      label: Social Links
+      formSchema:
+        - $formkit: text
+          name: twitter
+          label: Twitter URL
+          value: ""
+        
+        - $formkit: text
+          name: github
+          label: GitHub URL
+          value: ""
+        
+        - $formkit: text
+          name: email
+          label: Email Address
+          value: ""
+    
+    - group: features
+      label: Feature Toggles
+      formSchema:
+        - $formkit: checkbox
+          name: enable_dark_mode
+          label: Enable Dark Mode
+          value: true
+        
+        - $formkit: checkbox
+          name: enable_search
+          label: Enable Search
+          value: true
+        
+        - $formkit: checkbox
+          name: show_author
+          label: Show Post Author
+          value: true
+        
+        - $formkit: number
+          name: posts_per_page
+          label: Posts Per Page
+          value: 10
+          min: 1
+          max: 50
+```
+
+### Linking Settings to Theme
+
+Reference your settings file in `theme.yaml`:
+
+```yaml title="theme.yaml"
+spec:
+  settingName: theme-my-theme-setting
+  configMapName: theme-my-theme-configmap
+```
+
+### How Settings Work
+
+When a theme with `settingName` is installed, Halo automatically:
+
+1. Creates a `Setting` resource from `settings.yaml`
+2. Creates a `ConfigMap` to store user-configured values
+3. Makes settings available in templates via `theme.config`
+
+```java title="application/src/main/java/run/halo/app/core/reconciler/ThemeReconciler.java"
+var settingName = spec.getSettingName();
+if (StringUtils.isBlank(settingName)) {
+    return;
+}
+var configMapName = spec.getConfigMapName();
+if (StringUtils.isBlank(configMapName)) {
+    configMapName = UUID.randomUUID().toString();
+}
+spec.setConfigMapName(configMapName);
+SettingUtils.createOrUpdateConfigMap(client, settingName, configMapName);
+```
+
+### Accessing Settings in Templates
+
+```html
+<!-- Use setting values -->
+<div th:style="'--primary-color: ' + ${theme.config.primary_color}"></div>
+
+<h1 th:text="${theme.config.hero_title}">Welcome</h1>
+<p th:text="${theme.config.hero_subtitle}">Subtitle</p>
+
+<!-- Conditional based on settings -->
+<div th:if="${theme.config.enable_dark_mode}" class="dark-mode-toggle">
+    <!-- Dark mode toggle button -->
+</div>
+
+<div th:if="${theme.config.show_author}">
+    <span th:text="${post.owner.displayName}">Author</span>
+</div>
+
+<!-- Social links -->
+<a th:if="${theme.config.twitter}" 
+   th:href="${theme.config.twitter}"
+   target="_blank">Twitter</a>
+```
+
+## FormKit Field Types
+
+Available field types for theme settings:
+
+<AccordionGroup>
+  <Accordion title="text - Single-line text input">
+    ```yaml
+    - $formkit: text
+      name: site_title
+      label: Site Title
+      value: My Site
+      placeholder: Enter site title
+    ```
+  </Accordion>
+
+  <Accordion title="textarea - Multi-line text input">
+    ```yaml
+    - $formkit: textarea
+      name: description
+      label: Description
+      value: ""
+      rows: 4
+    ```
+  </Accordion>
+
+  <Accordion title="select - Dropdown selection">
+    ```yaml
+    - $formkit: select
+      name: layout
+      label: Layout
+      value: default
+      options:
+        - label: Default
+          value: default
+        - label: Wide
+          value: wide
+    ```
+  </Accordion>
+
+  <Accordion title="checkbox - Boolean toggle">
+    ```yaml
+    - $formkit: checkbox
+      name: enable_feature
+      label: Enable Feature
+      value: true
+    ```
+  </Accordion>
+
+  <Accordion title="number - Numeric input">
+    ```yaml
+    - $formkit: number
+      name: posts_per_page
+      label: Posts Per Page
+      value: 10
+      min: 1
+      max: 100
+      step: 1
+    ```
+  </Accordion>
+
+  <Accordion title="color - Color picker">
+    ```yaml
+    - $formkit: color
+      name: primary_color
+      label: Primary Color
+      value: "#007bff"
+    ```
+  </Accordion>
+
+  <Accordion title="code - Code editor">
+    ```yaml
+    - $formkit: code
+      name: custom_css
+      label: Custom CSS
+      language: css
+      value: ""
+    ```
+  </Accordion>
+
+  <Accordion title="attachment - File upload">
+    ```yaml
+    - $formkit: attachment
+      name: logo
+      label: Site Logo
+      value: ""
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Use Semantic Versioning">
+    Follow semantic versioning (MAJOR.MINOR.PATCH) for your theme:
+    
+    - MAJOR: Breaking changes
+    - MINOR: New features, backward compatible
+    - PATCH: Bug fixes
+  </Step>
+
+  <Step title="Specify Version Requirements">
+    Always specify minimum Halo version to prevent compatibility issues:
+    
+    ```yaml
+    requires: ">=2.0.0"
+    ```
+  </Step>
+
+  <Step title="Organize Settings Logically">
+    Group related settings together for better user experience:
+    
+    ```yaml
+    forms:
+      - group: appearance
+      - group: layout
+      - group: social
+      - group: advanced
+    ```
+  </Step>
+
+  <Step title="Provide Sensible Defaults">
+    Set good default values for all settings so the theme works out of the box.
+  </Step>
+
+  <Step title="Include Screenshots">
+    Add screenshots for custom templates to help users choose the right layout.
+  </Step>
+
+  <Step title="Document Your Settings">
+    Use clear labels and helpful descriptions for all settings fields.
+  </Step>
+</Steps>
+
+## Complete Configuration Example
+
+Here's a comprehensive example combining all configuration elements:
+
+<CodeGroup>
+```yaml theme.yaml
+apiVersion: theme.halo.run/v1alpha1
+kind: Theme
+metadata:
+  name: halo-theme-awesome
+spec:
+  displayName: Awesome Theme
+  author:
+    name: Theme Developer
+    website: https://example.com
+  description: A feature-rich, highly customizable theme for Halo
+  logo: https://example.com/logo.png
+  homepage: https://example.com/themes/awesome
+  repo: https://github.com/username/halo-theme-awesome.git
+  issues: https://github.com/username/halo-theme-awesome/issues
+  version: 2.1.0
+  requires: ">=2.0.0"
+  license:
+    - name: MIT
+      url: https://opensource.org/licenses/MIT
+  settingName: theme-awesome-setting
+  configMapName: theme-awesome-configmap
+  customTemplates:
+    post:
+      - name: Gallery
+        description: Photo gallery layout
+        screenshot: /assets/screenshots/gallery.png
+        file: post_gallery.html
+      - name: Wide
+        description: Full-width layout
+        file: post_wide.html
+    page:
+      - name: Landing
+        description: Landing page
+        file: page_landing.html
+```
+
+```yaml settings.yaml
+apiVersion: v1alpha1
+kind: Setting
+metadata:
+  name: theme-awesome-setting
+spec:
+  forms:
+    - group: basic
+      label: Basic Settings
+      formSchema:
+        - $formkit: text
+          name: hero_title
+          label: Hero Title
+          value: Welcome
+        - $formkit: color
+          name: primary_color
+          label: Primary Color
+          value: "#007bff"
+    - group: features
+      label: Features
+      formSchema:
+        - $formkit: checkbox
+          name: enable_dark_mode
+          label: Dark Mode
+          value: true
+        - $formkit: number
+          name: posts_per_page
+          label: Posts Per Page
+          value: 10
+          min: 1
+          max: 50
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Theme Basics" icon="book" href="./basics">
+    Review fundamental theme development concepts
+  </Card>
+
+  <Card title="Templates" icon="file-code" href="./templates">
+    Learn advanced Thymeleaf template techniques
+  </Card>
+</CardGroup>

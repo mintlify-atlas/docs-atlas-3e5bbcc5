@@ -1,0 +1,540 @@
+---
+title: Template Development
+description: Master Thymeleaf template development for Halo themes
+---
+
+## Thymeleaf Template Engine
+
+Halo uses Thymeleaf as its template engine, providing powerful server-side HTML rendering with natural template syntax that can be displayed correctly in browsers even without processing.
+
+## Basic Template Syntax
+
+### Template Declaration
+
+Every Thymeleaf template should declare the Thymeleaf namespace:
+
+```html
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title th:text="${site.title}">Default Title</title>
+</head>
+<body>
+    <!-- Template content -->
+</body>
+</html>
+```
+
+### Variable Expressions
+
+Access model data using `${...}` syntax:
+
+```html
+<!-- Simple property -->
+<h1 th:text="${post.spec.title}">Post Title</h1>
+
+<!-- Nested properties -->
+<span th:text="${post.spec.author.name}">Author Name</span>
+
+<!-- Safe navigation (null-safe) -->
+<div th:text="${post.spec.excerpt?.raw}">Excerpt</div>
+```
+
+### Message Expressions
+
+Access internationalization messages using `#{...}`:
+
+```html
+<!-- Simple message -->
+<span th:text="#{post.readMore}">Read More</span>
+
+<!-- Message with parameters -->
+<span th:text="#{post.publishedOn(${post.spec.publishTime})}">Published on ...</span>
+```
+
+## Halo-Specific Features
+
+### Theme Asset URLs
+
+Use the `#theme.assets()` function to generate correct URLs for theme assets:
+
+```html
+<!-- CSS files -->
+<link rel="stylesheet" th:href="@{${#theme.assets('/css/style.css')}}" />
+
+<!-- JavaScript files -->
+<script th:src="@{${#theme.assets('/js/main.js')}}"></script>
+
+<!-- Images -->
+<img th:src="@{${#theme.assets('/images/logo.png')}}" alt="Logo" />
+```
+
+<Note>
+  The `#theme.assets()` function automatically handles theme preview mode and generates the correct URL pattern: `/themes/{themeName}/assets/{path}`
+</Note>
+
+### Implementation Details
+
+The asset URL generation is implemented in `DefaultLinkExpressionFactory`:
+
+```java title="application/src/main/java/run/halo/app/theme/dialect/DefaultLinkExpressionFactory.java"
+public String assets(String path) {
+    String assetsPath = ThemeLinkBuilder.THEME_ASSETS_PREFIX + path;
+    return linkBuilder.buildLink(context, assetsPath, null);
+}
+```
+
+### Route URLs
+
+Generate URLs for site routes:
+
+```html
+<!-- Homepage -->
+<a th:href="@{${#theme.route('/')}}">Home</a>
+
+<!-- Post permalink -->
+<a th:href="@{${#theme.route('/posts/' + ${post.metadata.name})}}">Read Post</a>
+
+<!-- Category archive -->
+<a th:href="@{${#theme.route('/categories/' + ${category.metadata.name})}}">View Category</a>
+```
+
+## Using Finder APIs
+
+Finder APIs provide access to content data in your templates. They are automatically injected into the template context.
+
+### PostFinder
+
+Access posts and post archives:
+
+```java title="application/src/main/java/run/halo/app/theme/finders/PostFinder.java"
+public interface PostFinder {
+    Mono<PostVo> getByName(String postName);
+    Mono<ContentVo> content(String postName);
+    Mono<NavigationPostVo> cursor(String current);
+    Flux<ListedPostVo> listAll();
+    Mono<ListResult<ListedPostVo>> list(Integer page, Integer size);
+    Mono<ListResult<ListedPostVo>> listByCategory(Integer page, Integer size, String categoryName);
+    Mono<ListResult<ListedPostVo>> listByTag(Integer page, Integer size, String tag);
+    Mono<ListResult<PostArchiveVo>> archives(Integer page, Integer size);
+}
+```
+
+#### Example: Display Recent Posts
+
+```html
+<div th:each="post : ${posts.items}" class="post-card">
+    <h2>
+        <a th:href="@{${post.status.permalink}}" 
+           th:text="${post.spec.title}">Post Title</a>
+    </h2>
+    <div class="post-meta">
+        <time th:datetime="${post.spec.publishTime}" 
+              th:text="${#temporals.format(post.spec.publishTime, 'yyyy-MM-dd')}">2024-01-01</time>
+        <span th:if="${post.categories.size() > 0}">
+            in <a th:href="@{'/categories/' + ${post.categories[0].metadata.name}}" 
+                  th:text="${post.categories[0].spec.displayName}">Category</a>
+        </span>
+    </div>
+    <div th:text="${post.excerpt.raw}" class="post-excerpt">Excerpt</div>
+    <a th:href="@{${post.status.permalink}}" th:text="#{post.readMore}">Read More</a>
+</div>
+
+<!-- Pagination -->
+<nav th:if="${posts.hasNext() || posts.hasPrevious()}">
+    <a th:if="${posts.hasPrevious()}" 
+       th:href="@{${'?page=' + (posts.page - 1)}}">Previous</a>
+    <span th:text="${posts.page + 1} + ' / ' + ${posts.totalPages}">1 / 10</span>
+    <a th:if="${posts.hasNext()}" 
+       th:href="@{${'?page=' + (posts.page + 1)}}">Next</a>
+</nav>
+```
+
+### CategoryFinder
+
+Access categories and category hierarchies:
+
+```java title="application/src/main/java/run/halo/app/theme/finders/CategoryFinder.java"
+public interface CategoryFinder {
+    Mono<CategoryVo> getByName(String name);
+    Flux<CategoryVo> getByNames(Collection<String> names);
+    Mono<ListResult<CategoryVo>> list(Integer page, Integer size);
+    Flux<CategoryVo> listAll();
+    Flux<CategoryTreeVo> listAsTree();
+    Flux<CategoryTreeVo> listAsTree(String name);
+    Flux<CategoryVo> getBreadcrumbs(String name);
+}
+```
+
+#### Example: Category Navigation
+
+```html
+<!-- Category tree navigation -->
+<ul class="category-tree">
+    <li th:each="category : ${categoryFinder.listAsTree()}">
+        <a th:href="@{'/categories/' + ${category.metadata.name}}" 
+           th:text="${category.spec.displayName}">Category</a>
+        <span th:if="${category.postCount > 0}" 
+              th:text="'(' + ${category.postCount} + ')'">( 0)</span>
+        
+        <!-- Nested categories -->
+        <ul th:if="${category.children.size() > 0}">
+            <li th:each="child : ${category.children}">
+                <a th:href="@{'/categories/' + ${child.metadata.name}}" 
+                   th:text="${child.spec.displayName}">Subcategory</a>
+            </li>
+        </ul>
+    </li>
+</ul>
+
+<!-- Breadcrumb navigation -->
+<nav th:with="breadcrumbs=${categoryFinder.getBreadcrumbs(category.metadata.name)}">
+    <a th:href="@{'/'}">Home</a>
+    <span th:each="crumb, iterStat : ${breadcrumbs}">
+        <span> / </span>
+        <a th:href="@{'/categories/' + ${crumb.metadata.name}}" 
+           th:text="${crumb.spec.displayName}">Category</a>
+    </span>
+</nav>
+```
+
+### MenuFinder
+
+Access navigation menus:
+
+```java title="application/src/main/java/run/halo/app/theme/finders/MenuFinder.java"
+public interface MenuFinder {
+    Mono<MenuVo> getByName(String name);
+    Mono<MenuVo> getPrimary();
+}
+```
+
+#### Example: Primary Navigation
+
+```html
+<nav th:with="menu=${menuFinder.getPrimary()}">
+    <ul>
+        <li th:each="item : ${menu.menuItems}">
+            <a th:href="@{${item.status.href}}" 
+               th:text="${item.status.displayName}"
+               th:target="${item.spec.target}">Menu Item</a>
+            
+            <!-- Nested menu items -->
+            <ul th:if="${item.children.size() > 0}">
+                <li th:each="child : ${item.children}">
+                    <a th:href="@{${child.status.href}}" 
+                       th:text="${child.status.displayName}">Submenu Item</a>
+                </li>
+            </ul>
+        </li>
+    </ul>
+</nav>
+```
+
+## Template Fragments
+
+Create reusable template components using fragments:
+
+### Defining Fragments
+
+```html title="templates/partials/header.html"
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title th:text="${title} + ' - ' + ${site.title}">Page Title - Site</title>
+    <link rel="stylesheet" th:href="@{${#theme.assets('/css/style.css')}}" />
+</head>
+<body>
+    <header th:fragment="header">
+        <div class="container">
+            <h1 th:text="${site.title}">Site Title</h1>
+            <!-- Navigation menu -->
+        </div>
+    </header>
+</body>
+</html>
+```
+
+### Using Fragments
+
+```html title="templates/post.html"
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{partials/header :: head(${post.spec.title})}"></head>
+<body>
+    <div th:replace="~{partials/header :: header}"></div>
+    
+    <main>
+        <article>
+            <h1 th:text="${post.spec.title}">Post Title</h1>
+            <div th:utext="${content.content}">Content</div>
+        </article>
+    </main>
+    
+    <div th:replace="~{partials/footer :: footer}"></div>
+</body>
+</html>
+```
+
+## Conditional Rendering
+
+### Simple Conditionals
+
+```html
+<!-- Show/hide elements -->
+<div th:if="${post.spec.pinned}" class="badge">Pinned</div>
+<div th:unless="${post.spec.pinned}" class="normal">Regular Post</div>
+
+<!-- Alternative: th:if with negation -->
+<div th:if="${!post.spec.pinned}" class="normal">Regular Post</div>
+```
+
+### Switch Statements
+
+```html
+<div th:switch="${post.status.phase}">
+    <span th:case="'PUBLISHED'" class="badge-success">Published</span>
+    <span th:case="'DRAFT'" class="badge-warning">Draft</span>
+    <span th:case="*" class="badge-secondary">Unknown</span>
+</div>
+```
+
+## Iteration
+
+### Basic Loops
+
+```html
+<div th:each="post : ${posts.items}">
+    <h2 th:text="${post.spec.title}">Title</h2>
+</div>
+```
+
+### Loop with Status
+
+```html
+<div th:each="post, iterStat : ${posts.items}" 
+     th:class="${iterStat.odd} ? 'odd' : 'even'">
+    <span th:text="${iterStat.index + 1}">1</span>.
+    <h2 th:text="${post.spec.title}">Title</h2>
+</div>
+```
+
+Status variables:
+- `index` - Current iteration index (zero-based)
+- `count` - Current iteration count (one-based)
+- `size` - Total number of elements
+- `current` - Current element
+- `even/odd` - Boolean flags
+- `first/last` - Boolean flags
+
+## Custom Template Processors
+
+Halo provides extension points for custom template processing:
+
+### TemplateHeadProcessor
+
+Inject content into the `<head>` tag:
+
+```java title="api/src/main/java/run/halo/app/theme/dialect/TemplateHeadProcessor.java"
+@FunctionalInterface
+public interface TemplateHeadProcessor extends ExtensionPoint {
+    Mono<Void> process(ITemplateContext context, IModel model,
+        IElementModelStructureHandler structureHandler);
+}
+```
+
+<Info>
+  Plugins can implement `TemplateHeadProcessor` to inject styles, scripts, or meta tags into theme templates.
+</Info>
+
+### CommentWidget
+
+Extend the `<halo:comment />` tag:
+
+```java title="api/src/main/java/run/halo/app/theme/dialect/CommentWidget.java"
+public interface CommentWidget extends ExtensionPoint {
+    void render(ITemplateContext context, IProcessableElementTag tag,
+        IElementTagStructureHandler structureHandler);
+}
+```
+
+## Template Variables
+
+### Common Variables
+
+These variables are available in most templates:
+
+<CodeGroup>
+```html Site Information
+${site.title}          <!-- Site title -->
+${site.subtitle}       <!-- Site subtitle -->
+${site.description}    <!-- Site description -->
+${site.logo}           <!-- Site logo URL -->
+${site.favicon}        <!-- Site favicon URL -->
+```
+
+```html User Information
+${user.name}           <!-- Current user name -->
+${user.email}          <!-- Current user email -->
+${user.avatar}         <!-- Current user avatar URL -->
+```
+
+```html Template Metadata
+${_templateId}         <!-- Current template ID -->
+```
+</CodeGroup>
+
+### Post Template Variables
+
+```html
+${post}                <!-- PostVo object -->
+${post.metadata.name}  <!-- Post unique name -->
+${post.spec.title}     <!-- Post title -->
+${post.spec.slug}      <!-- Post slug -->
+${post.spec.excerpt}   <!-- Post excerpt -->
+${post.spec.cover}     <!-- Cover image URL -->
+${post.spec.publishTime} <!-- Publish timestamp -->
+${post.spec.pinned}    <!-- Is pinned -->
+${post.spec.priority}  <!-- Priority value -->
+${post.status.permalink} <!-- Post URL -->
+${post.categories}     <!-- List of categories -->
+${post.tags}           <!-- List of tags -->
+${post.contributors}   <!-- List of contributors -->
+
+${content}             <!-- ContentVo object -->
+${content.content}     <!-- Rendered HTML content -->
+${content.raw}         <!-- Raw markdown content -->
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Use Natural Templates">
+    Write templates that display correctly even without processing:
+    
+    ```html
+    <!-- Good: Shows placeholder text -->
+    <h1 th:text="${post.spec.title}">Post Title Placeholder</h1>
+    
+    <!-- Avoid: Empty without processing -->
+    <h1 th:text="${post.spec.title}"></h1>
+    ```
+  </Step>
+
+  <Step title="Handle Null Values">
+    Use safe navigation or th:if to prevent errors:
+    
+    ```html
+    <!-- Safe navigation -->
+    <span th:text="${post.spec.excerpt?.raw}">Excerpt</span>
+    
+    <!-- Conditional rendering -->
+    <div th:if="${post.spec.cover}">
+        <img th:src="${post.spec.cover}" alt="Cover" />
+    </div>
+    ```
+  </Step>
+
+  <Step title="Extract Common Fragments">
+    Reuse code with template fragments to maintain consistency and reduce duplication.
+  </Step>
+
+  <Step title="Use Semantic HTML">
+    Structure your templates with proper HTML5 semantic elements (`<article>`, `<nav>`, `<aside>`, etc.).
+  </Step>
+
+  <Step title="Optimize Performance">
+    - Minimize nested loops
+    - Use `th:remove` to clean up template markup
+    - Cache fragments when possible
+  </Step>
+</Steps>
+
+## Example: Complete Post Template
+
+```html title="templates/post.html"
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title th:text="${post.spec.title} + ' - ' + ${site.title}">Post Title - Site</title>
+    <meta th:if="${post.spec.excerpt}" 
+          name="description" 
+          th:content="${post.spec.excerpt.raw}" />
+    <link rel="stylesheet" th:href="@{${#theme.assets('/css/style.css')}}" />
+</head>
+<body>
+    <header th:replace="~{partials/header :: header}"></header>
+    
+    <main class="container">
+        <article class="post">
+            <!-- Cover image -->
+            <div th:if="${post.spec.cover}" class="post-cover">
+                <img th:src="${post.spec.cover}" 
+                     th:alt="${post.spec.title}" />
+            </div>
+            
+            <!-- Post header -->
+            <header class="post-header">
+                <h1 th:text="${post.spec.title}">Post Title</h1>
+                
+                <div class="post-meta">
+                    <time th:datetime="${post.spec.publishTime}" 
+                          th:text="${#temporals.format(post.spec.publishTime, 'yyyy-MM-dd HH:mm')}">2024-01-01</time>
+                    
+                    <span th:if="${post.categories.size() > 0}">
+                        <span th:text="#{post.in}">in</span>
+                        <span th:each="category, iterStat : ${post.categories}">
+                            <a th:href="@{'/categories/' + ${category.metadata.name}}" 
+                               th:text="${category.spec.displayName}">Category</a>
+                            <span th:if="${!iterStat.last}">, </span>
+                        </span>
+                    </span>
+                </div>
+            </header>
+            
+            <!-- Post content -->
+            <div class="post-content" th:utext="${content.content}">
+                Post content goes here...
+            </div>
+            
+            <!-- Post tags -->
+            <footer th:if="${post.tags.size() > 0}" class="post-footer">
+                <div class="post-tags">
+                    <span th:text="#{post.tags}">Tags:</span>
+                    <a th:each="tag : ${post.tags}" 
+                       th:href="@{'/tags/' + ${tag.metadata.name}}" 
+                       th:text="${tag.spec.displayName}"
+                       class="tag">Tag</a>
+                </div>
+            </footer>
+        </article>
+        
+        <!-- Comment section -->
+        <section class="comments">
+            <halo:comment />
+        </section>
+    </main>
+    
+    <footer th:replace="~{partials/footer :: footer}"></footer>
+    
+    <script th:src="@{${#theme.assets('/js/main.js')}}"></script>
+</body>
+</html>
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Assets" icon="image" href="./assets">
+    Learn how to manage CSS, JavaScript, and images
+  </Card>
+
+  <Card title="Configuration" icon="gear" href="./configuration">
+    Configure your theme settings and options
+  </Card>
+</CardGroup>

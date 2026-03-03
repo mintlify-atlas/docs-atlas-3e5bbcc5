@@ -1,0 +1,362 @@
+---
+title: Installing and managing plugins
+description: Learn how to install, activate, configure, and manage plugins in Halo CMS.
+---
+
+Plugins extend Halo's functionality by adding new features, integrations, and capabilities without modifying the core system.
+
+## Understanding plugins in Halo
+
+Plugins in Halo:
+
+- Add new features and functionality to your site
+- Integrate with third-party services and APIs
+- Can be enabled or disabled without uninstalling
+- Are version-controlled and can be updated independently
+- May provide their own settings and configuration options
+
+<Info>
+  You can have multiple plugins installed simultaneously, and they can be enabled or disabled individually. This allows you to test plugins without fully committing to them.
+</Info>
+
+## Installing a plugin
+
+### From the plugin marketplace
+
+<Steps>
+  <Step title="Navigate to plugins">
+    From the admin dashboard, click on **Plugins** in the sidebar.
+  </Step>
+  
+  <Step title="Browse plugins">
+    Click **Install New Plugin** or browse the plugin marketplace to discover available plugins.
+  </Step>
+  
+  <Step title="Select a plugin">
+    Click on a plugin to view its details, features, requirements, and user reviews.
+  </Step>
+  
+  <Step title="Install the plugin">
+    Click the **Install** button. Halo will download and install the plugin automatically.
+  </Step>
+  
+  <Step title="Wait for installation">
+    The installation process may take a few moments. Wait for the success notification.
+  </Step>
+</Steps>
+
+### By uploading a plugin file
+
+If you have a plugin file (.jar) from another source:
+
+<Steps>
+  <Step title="Navigate to plugins">
+    Go to **Plugins** in the admin dashboard.
+  </Step>
+  
+  <Step title="Upload plugin">
+    Click **Upload Plugin** and select the plugin .jar file from your computer.
+  </Step>
+  
+  <Step title="Wait for upload">
+    The plugin will be uploaded and installed. Wait for the process to complete.
+  </Step>
+  
+  <Step title="Verify installation">
+    Once installed, the plugin appears in your plugins list with a status indicating it's ready to be enabled.
+  </Step>
+</Steps>
+
+<Warning>
+  Only install plugins from trusted sources. Malicious plugins can compromise your site's security and data. Always download plugins from the official Halo marketplace or reputable developers.
+</Warning>
+
+## Enabling a plugin
+
+After installing a plugin, you need to enable it to activate its functionality:
+
+<Steps>
+  <Step title="View installed plugins">
+    Navigate to **Plugins** to see all installed plugins.
+  </Step>
+  
+  <Step title="Review plugin details">
+    Click on the plugin to read its description and check if it requires any configuration.
+  </Step>
+  
+  <Step title="Enable the plugin">
+    Click the **Enable** button or toggle the enable switch for the plugin.
+  </Step>
+  
+  <Step title="Wait for activation">
+    The plugin will start and activate. Wait for the status to change to "Started" or "Running".
+  </Step>
+  
+  <Step title="Verify functionality">
+    Check that the plugin's features are available. Look for new menu items, settings, or functionality it adds.
+  </Step>
+</Steps>
+
+<Note>
+  Some plugins require additional configuration after enabling. Check the plugin's settings page or documentation for setup instructions.
+</Note>
+
+## Configuring plugin settings
+
+Many plugins provide customization options:
+
+<Steps>
+  <Step title="Access plugin settings">
+    Navigate to **Plugins**, find the enabled plugin, and click **Settings** or **Configure**.
+  </Step>
+  
+  <Step title="Review available settings">
+    Plugin settings vary widely depending on the plugin's purpose. Common settings include:
+    - API keys and authentication credentials
+    - Feature toggles and options
+    - Display preferences
+    - Integration configurations
+    - Performance settings
+  </Step>
+  
+  <Step title="Configure settings">
+    Fill in the required information and adjust settings according to your needs.
+  </Step>
+  
+  <Step title="Save changes">
+    Click **Save** to apply your plugin settings. Some plugins may require restarting after configuration changes.
+  </Step>
+</Steps>
+
+<Tip>
+  Plugin settings are preserved when you disable a plugin. If you re-enable the plugin later, your configuration will still be intact.
+</Tip>
+
+## Understanding plugin states
+
+Plugins in Halo can have several states:
+
+- **Started**: The plugin is running and fully functional
+- **Stopped**: The plugin is installed but not running
+- **Disabled**: The plugin is installed but disabled by the user
+- **Failed**: The plugin encountered an error and couldn't start
+- **Resolved**: The plugin is installed and its dependencies are satisfied, ready to start
+
+You can view a plugin's current state in the plugins list. If a plugin is in the "Failed" state, check the system logs for error details.
+
+## Disabling a plugin
+
+To temporarily turn off a plugin without uninstalling it:
+
+<Steps>
+  <Step title="Navigate to plugins">
+    Go to **Plugins** in the admin dashboard.
+  </Step>
+  
+  <Step title="Find the plugin">
+    Locate the plugin you want to disable.
+  </Step>
+  
+  <Step title="Disable the plugin">
+    Click the **Disable** button or toggle the enable switch to off.
+  </Step>
+  
+  <Step title="Wait for shutdown">
+    The plugin will stop running. Its features will no longer be available on your site.
+  </Step>
+</Steps>
+
+<Note>
+  Disabling a plugin doesn't delete its data or settings. You can re-enable it at any time to restore its functionality.
+</Note>
+
+## Updating plugins
+
+Keep your plugins up-to-date to get new features, improvements, and security patches:
+
+<Steps>
+  <Step title="Check for updates">
+    Navigate to **Plugins**. Plugins with available updates display an **Update Available** badge.
+  </Step>
+  
+  <Step title="Review update details">
+    Click on the plugin to view the changelog and see what's new in the update.
+  </Step>
+  
+  <Step title="Backup your site">
+    Before updating, create a backup of your site in case you need to roll back.
+  </Step>
+  
+  <Step title="Update the plugin">
+    Click the **Update** button. Halo will download and install the new version.
+  </Step>
+  
+  <Step title="Restart if needed">
+    Some plugins may need to restart after updating. Follow any prompts to complete the update.
+  </Step>
+  
+  <Step title="Verify functionality">
+    After updating, test the plugin's features to ensure everything works correctly.
+  </Step>
+</Steps>
+
+<Warning>
+  Plugin updates may introduce breaking changes or require updated dependencies. Always read the changelog and test updates on a staging site if possible before updating on a live production site.
+</Warning>
+
+## Checking plugin dependencies
+
+Some plugins depend on other plugins or require specific Halo versions:
+
+<Steps>
+  <Step title="View plugin details">
+    Navigate to **Plugins** and click on a plugin to view its details.
+  </Step>
+  
+  <Step title="Check requirements">
+    Look for the **Requires** section that lists:
+    - Minimum Halo version required
+    - Other plugins that must be installed and enabled
+  </Step>
+  
+  <Step title="Install dependencies">
+    If dependencies are missing, install and enable the required plugins first.
+  </Step>
+  
+  <Step title="Enable the plugin">
+    Once all dependencies are satisfied, you can enable the plugin.
+  </Step>
+</Steps>
+
+<Info>
+  Halo will prevent you from enabling a plugin if its dependencies aren't met. Check the error message for details about which dependencies need to be installed.
+</Info>
+
+## Uninstalling plugins
+
+To completely remove a plugin from your system:
+
+<Steps>
+  <Step title="Disable the plugin">
+    First, disable the plugin if it's currently enabled. You cannot uninstall running plugins.
+  </Step>
+  
+  <Step title="Backup plugin data">
+    If the plugin stores important data, export or back it up before uninstalling.
+  </Step>
+  
+  <Step title="Navigate to plugins">
+    Go to **Plugins** in the admin dashboard.
+  </Step>
+  
+  <Step title="Uninstall the plugin">
+    Click the **Uninstall** or **Delete** button next to the plugin.
+  </Step>
+  
+  <Step title="Confirm deletion">
+    Confirm the action when prompted. The plugin and its files will be permanently removed.
+  </Step>
+</Steps>
+
+<Warning>
+  Uninstalling a plugin may delete its data and settings permanently. Some plugins offer an option to preserve data during uninstallation, but this varies by plugin. Always backup important data before uninstalling.
+</Warning>
+
+## Troubleshooting plugin issues
+
+### Plugin won't start
+
+<Steps>
+  <Step title="Check dependencies">
+    Verify that all required plugins are installed and enabled.
+  </Step>
+  
+  <Step title="Verify Halo version">
+    Ensure your Halo version meets the plugin's requirements.
+  </Step>
+  
+  <Step title="Review logs">
+    Check **Settings** > **Logs** for error messages related to the plugin.
+  </Step>
+  
+  <Step title="Restart Halo">
+    Sometimes a full system restart can resolve plugin startup issues.
+  </Step>
+</Steps>
+
+### Plugin conflicts
+
+If you experience issues after enabling a plugin:
+
+<Steps>
+  <Step title="Disable recently added plugins">
+    Disable plugins one at a time to identify which one is causing the conflict.
+  </Step>
+  
+  <Step title="Check for known issues">
+    Review the plugin's documentation or issue tracker for known compatibility problems.
+  </Step>
+  
+  <Step title="Update all plugins">
+    Ensure all plugins are running the latest versions, as updates often fix conflicts.
+  </Step>
+  
+  <Step title="Contact plugin developers">
+    If conflicts persist, report the issue to the plugin developers with details about your setup.
+  </Step>
+</Steps>
+
+### Performance issues
+
+If plugins are slowing down your site:
+
+<Steps>
+  <Step title="Identify heavy plugins">
+    Check system performance metrics to identify plugins consuming excessive resources.
+  </Step>
+  
+  <Step title="Review plugin settings">
+    Some plugins have performance-related settings that can be optimized.
+  </Step>
+  
+  <Step title="Disable unused plugins">
+    Disable plugins that you're not actively using to reduce overhead.
+  </Step>
+  
+  <Step title="Contact developers">
+    Report performance issues to plugin developers so they can optimize their code.
+  </Step>
+</Steps>
+
+## System-reserved plugins
+
+Halo may include system-reserved plugins that provide core functionality:
+
+- These plugins are marked with a special label in the plugins list
+- They cannot be disabled or uninstalled as they're essential for Halo's operation
+- They're automatically updated with Halo system updates
+
+<Info>
+  System-reserved plugins are maintained by the Halo core team and are thoroughly tested for compatibility and security.
+</Info>
+
+## Plugin development
+
+If you want to create custom plugins:
+
+- Refer to the [Plugin Development Guide](/developer/plugin/basics) in the developer documentation
+- Study existing plugins to understand Halo's plugin architecture
+- Use the plugin development SDK and APIs provided by Halo
+- Test thoroughly before deploying to production
+
+## Best practices for plugin management
+
+- **Install only what you need**: Too many plugins can slow down your site and increase maintenance burden
+- **Keep plugins updated**: Regular updates provide security fixes and new features
+- **Use trusted sources**: Only install plugins from the official marketplace or reputable developers
+- **Test before deploying**: Test new plugins on a staging environment before installing on production
+- **Monitor performance**: Regularly review plugin impact on site performance
+- **Maintain backups**: Always backup before installing, updating, or removing plugins
+- **Review permissions**: Understand what access and permissions each plugin requires
+- **Remove unused plugins**: Uninstall plugins you're no longer using to reduce security risks
+- **Document configurations**: Keep notes about plugin settings and customizations

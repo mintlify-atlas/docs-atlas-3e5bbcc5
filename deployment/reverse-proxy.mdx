@@ -1,0 +1,413 @@
+---
+title: "Reverse proxy setup"
+description: "Configure Nginx or Caddy as a reverse proxy for Halo with SSL support"
+---
+
+## Why use a reverse proxy
+
+A reverse proxy provides essential features for production deployments:
+
+- **SSL/TLS termination**: Secure your site with HTTPS
+- **Domain routing**: Serve your site on a custom domain
+- **Load balancing**: Distribute traffic across multiple instances
+- **Compression**: Reduce bandwidth usage with gzip/brotli
+- **Caching**: Improve performance with static file caching
+- **Rate limiting**: Protect against abuse and DDoS attacks
+
+<Info>
+Halo runs on port 8090 by default and should not be exposed directly to the internet. Always use a reverse proxy in production.
+</Info>
+
+## Nginx configuration
+
+Nginx is a high-performance web server and reverse proxy commonly used with Halo.
+
+### Basic configuration
+
+<Steps>
+  <Step title="Install Nginx">
+    <CodeGroup>
+    ```bash Ubuntu/Debian
+    sudo apt update
+    sudo apt install nginx
+    ```
+    
+    ```bash CentOS/RHEL
+    sudo yum install nginx
+    ```
+    
+    ```bash macOS
+    brew install nginx
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Create site configuration">
+    Create a configuration file at `/etc/nginx/sites-available/halo.conf`:
+    
+    ```nginx /etc/nginx/sites-available/halo.conf
+    server {
+        listen 80;
+        listen [::]:80;
+        server_name yourdomain.com www.yourdomain.com;
+        
+        # Redirect HTTP to HTTPS
+        return 301 https://$server_name$request_uri;
+    }
+    
+    server {
+        listen 443 ssl http2;
+        listen [::]:443 ssl http2;
+        server_name yourdomain.com www.yourdomain.com;
+        
+        # SSL configuration (update paths after obtaining certificates)
+        ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers HIGH:!aNULL:!MD5;
+        ssl_prefer_server_ciphers on;
+        
+        # Security headers
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        
+        # Max upload size (adjust based on your needs)
+        client_max_body_size 100M;
+        
+        # Proxy settings
+        location / {
+            proxy_pass http://localhost:8090;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # WebSocket support
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            
+            # Timeouts
+            proxy_connect_timeout 600s;
+            proxy_send_timeout 600s;
+            proxy_read_timeout 600s;
+        }
+        
+        # Static file caching
+        location ~* \.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$ {
+            proxy_pass http://localhost:8090;
+            proxy_set_header Host $host;
+            expires 30d;
+            add_header Cache-Control "public, immutable";
+        }
+    }
+    ```
+  </Step>
+  
+  <Step title="Enable the site">
+    Create a symbolic link and test the configuration:
+    ```bash
+    sudo ln -s /etc/nginx/sites-available/halo.conf /etc/nginx/sites-enabled/
+    sudo nginx -t
+    ```
+  </Step>
+  
+  <Step title="Obtain SSL certificate">
+    Use Certbot to get a free SSL certificate from Let's Encrypt:
+    ```bash
+    sudo apt install certbot python3-certbot-nginx
+    sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+    ```
+    
+    Certbot will automatically update your Nginx configuration with SSL settings.
+  </Step>
+  
+  <Step title="Restart Nginx">
+    ```bash
+    sudo systemctl restart nginx
+    ```
+  </Step>
+</Steps>
+
+### Advanced configuration
+
+For better performance and security, add these optimizations:
+
+```nginx /etc/nginx/sites-available/halo.conf
+server {
+    # ... previous configuration ...
+    
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript
+               application/x-javascript application/xml+rss
+               application/json application/javascript;
+    
+    # Rate limiting (adjust as needed)
+    limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
+    limit_req_zone $binary_remote_addr zone=upload_limit:10m rate=1r/s;
+    
+    location /api/ {
+        limit_req zone=api_limit burst=20 nodelay;
+        proxy_pass http://localhost:8090;
+        # ... other proxy settings ...
+    }
+    
+    location /upload/ {
+        limit_req zone=upload_limit burst=5 nodelay;
+        proxy_pass http://localhost:8090;
+        # ... other proxy settings ...
+    }
+    
+    # Deny access to sensitive files
+    location ~ /\. {
+        deny all;
+    }
+    
+    # Logging
+    access_log /var/log/nginx/halo_access.log;
+    error_log /var/log/nginx/halo_error.log;
+}
+```
+
+## Caddy configuration
+
+Caddy is a modern web server with automatic HTTPS and simpler configuration.
+
+### Basic configuration
+
+<Steps>
+  <Step title="Install Caddy">
+    <CodeGroup>
+    ```bash Ubuntu/Debian
+    sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+    sudo apt update
+    sudo apt install caddy
+    ```
+    
+    ```bash CentOS/RHEL
+    yum install yum-plugin-copr
+    yum copr enable @caddy/caddy
+    yum install caddy
+    ```
+    
+    ```bash macOS
+    brew install caddy
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Create Caddyfile">
+    Create or edit `/etc/caddy/Caddyfile`:
+    
+    ```caddy /etc/caddy/Caddyfile
+    yourdomain.com www.yourdomain.com {
+        # Caddy automatically handles HTTPS with Let's Encrypt
+        
+        # Reverse proxy to Halo
+        reverse_proxy localhost:8090 {
+            # Forward real IP
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+        
+        # Max upload size
+        request_body {
+            max_size 100MB
+        }
+        
+        # Compression
+        encode gzip zstd
+        
+        # Security headers
+        header {
+            X-Frame-Options "SAMEORIGIN"
+            X-Content-Type-Options "nosniff"
+            X-XSS-Protection "1; mode=block"
+            -Server
+        }
+        
+        # Logging
+        log {
+            output file /var/log/caddy/halo.log
+            format json
+        }
+    }
+    ```
+  </Step>
+  
+  <Step title="Start Caddy">
+    ```bash
+    sudo systemctl enable caddy
+    sudo systemctl start caddy
+    ```
+    
+    Caddy will automatically obtain and renew SSL certificates.
+  </Step>
+</Steps>
+
+<Info>
+Caddy automatically manages SSL certificates from Let's Encrypt. No additional configuration needed!
+</Info>
+
+### Advanced configuration
+
+Add rate limiting and caching with Caddy:
+
+```caddy /etc/caddy/Caddyfile
+yourdomain.com www.yourdomain.com {
+    # Rate limiting
+    route /api/* {
+        rate_limit {
+            zone api {
+                key {remote_host}
+                rate 10r/s
+                burst 20
+            }
+        }
+        reverse_proxy localhost:8090
+    }
+    
+    # Static file caching
+    @static {
+        path *.jpg *.jpeg *.png *.gif *.ico *.css *.js *.svg *.woff *.woff2 *.ttf *.eot
+    }
+    
+    handle @static {
+        header Cache-Control "public, max-age=2592000, immutable"
+        reverse_proxy localhost:8090
+    }
+    
+    # Default handler
+    handle {
+        reverse_proxy localhost:8090
+    }
+}
+```
+
+## Update Halo external URL
+
+After configuring your reverse proxy, update Halo's external URL setting:
+
+<CodeGroup>
+
+```bash Docker
+# Add to your docker run command or docker-compose.yml
+--halo.external-url=https://yourdomain.com
+```
+
+```yaml Kubernetes
+# Add to Halo container args in deployment
+args:
+  - --halo.external-url=https://yourdomain.com
+```
+
+```yaml Configuration file
+# Add to application.yaml in Halo work directory
+halo:
+  external-url: https://yourdomain.com
+```
+
+</CodeGroup>
+
+<Warning>
+The external URL must match your actual domain. Incorrect configuration can cause issues with redirects, authentication, and asset loading.
+</Warning>
+
+## Testing your configuration
+
+<Steps>
+  <Step title="Test SSL configuration">
+    Check your SSL setup at [SSL Labs](https://www.ssllabs.com/ssltest/):
+    ```
+    https://www.ssllabs.com/ssltest/analyze.html?d=yourdomain.com
+    ```
+  </Step>
+  
+  <Step title="Verify headers">
+    Check security headers are properly set:
+    ```bash
+    curl -I https://yourdomain.com
+    ```
+  </Step>
+  
+  <Step title="Test upload limits">
+    Verify file upload works correctly through the proxy by uploading an image in Halo admin panel.
+  </Step>
+  
+  <Step title="Monitor logs">
+    Check for any errors:
+    <CodeGroup>
+    ```bash Nginx
+    sudo tail -f /var/log/nginx/halo_error.log
+    ```
+    
+    ```bash Caddy
+    sudo journalctl -u caddy -f
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="502 Bad Gateway error">
+    This usually means Nginx/Caddy can't connect to Halo:
+    
+    1. Check if Halo is running:
+       ```bash
+       curl http://localhost:8090
+       ```
+    
+    2. Verify proxy_pass address matches Halo's address
+    
+    3. Check firewall rules allow connection
+  </Accordion>
+  
+  <Accordion title="File upload fails">
+    Increase the upload size limit:
+    
+    **Nginx**: Set `client_max_body_size 100M;`
+    
+    **Caddy**: Set `request_body { max_size 100MB }`
+    
+    Also verify Halo's max upload size is configured properly.
+  </Accordion>
+  
+  <Accordion title="WebSocket connection fails">
+    Ensure WebSocket headers are properly forwarded:
+    
+    **Nginx**: Include `proxy_set_header Upgrade $http_upgrade;` and `proxy_set_header Connection "upgrade";`
+    
+    **Caddy**: WebSocket support is automatic
+  </Accordion>
+  
+  <Accordion title="CSS/JS not loading">
+    Check that the X-Forwarded-Proto header is set correctly:
+    
+    ```nginx
+    proxy_set_header X-Forwarded-Proto $scheme;
+    ```
+    
+    Also verify Halo's external URL is configured with `https://`
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Backup and restore" icon="floppy-disk" href="/deployment/backup-restore">
+    Set up automated backups for your Halo installation
+  </Card>
+  
+  <Card title="Docker deployment" icon="docker" href="/deployment/docker">
+    Learn about Docker-based deployment options
+  </Card>
+</CardGroup>

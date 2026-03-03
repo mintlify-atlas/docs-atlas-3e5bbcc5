@@ -1,0 +1,541 @@
+---
+title: Notification System
+description: Learn how to implement and extend the notification framework in Halo CMS
+---
+
+Halo provides a comprehensive notification system that supports subscriptions, multiple notification methods, and customizable templates. This system enables user collaboration features like comment notifications, registration verification, and custom plugin events.
+
+## Architecture Overview
+
+The notification system consists of several key components:
+
+1. **ReasonType & Reason**: Define notification event types and instances
+2. **Subscription**: Manage user subscriptions to events
+3. **Notification**: Store in-app notifications
+4. **NotificationTemplate**: Customize notification content
+5. **NotifierDescriptor & ReactiveNotifier**: Define and implement notification delivery methods
+6. **NotificationCenter**: Coordinate notification processing
+
+## Core Data Models
+
+### ReasonType: Event Categories
+
+Defines a category of notification events with properties:
+
+```yaml
+apiVersion: notification.halo.run/v1alpha1
+kind: ReasonType
+metadata:
+  name: new-comment-on-post
+spec:
+  displayName: "Comment Received"
+  description: "The user has received a comment on a post."
+  properties:
+    - name: postName
+      type: string
+      description: "The name of the post."
+      optional: false
+    - name: postTitle
+      type: string
+      optional: true
+    - name: commenter
+      type: string
+      description: "The name of the commenter."
+      optional: false
+    - name: comment
+      type: string
+      description: "The content of the comment."
+      optional: false
+```
+
+### Reason: Event Instances
+
+Created when a notification event occurs:
+
+```yaml
+apiVersion: notification.halo.run/v1alpha1
+kind: Reason
+metadata:
+  name: comment-axgu
+spec:
+  reasonType: new-comment-on-post
+  author: 'john-doe'
+  subject:
+    apiVersion: 'content.halo.run/v1alpha1'
+    kind: Post
+    name: 'post-axgu'
+    title: 'Hello World'
+    url: 'https://example.com/posts/hello-world'
+  attributes:
+    postName: "post-axgu"
+    postTitle: "Hello World"
+    commenter: "jane-smith"
+    comment: "Great post! Thanks for sharing."
+```
+
+**Creating a Reason Programmatically:**
+
+```java
+import run.halo.app.notification.NotificationCenter;
+import run.halo.app.core.extension.notification.Reason;
+import reactor.core.publisher.Mono;
+
+@Component
+public class CommentNotificationService {
+    
+    private final NotificationCenter notificationCenter;
+    private final ReactiveExtensionClient client;
+    
+    public Mono<Void> notifyCommentReceived(Comment comment, Post post) {
+        var reason = new Reason();
+        var metadata = new Metadata();
+        metadata.setName("comment-" + comment.getMetadata().getName());
+        reason.setMetadata(metadata);
+        
+        var spec = new Reason.Spec();
+        spec.setReasonType("new-comment-on-post");
+        spec.setAuthor(comment.getSpec().getOwner());
+        
+        // Set subject
+        var subject = new Reason.Subject();
+        subject.setApiVersion("content.halo.run/v1alpha1");
+        subject.setKind("Post");
+        subject.setName(post.getMetadata().getName());
+        subject.setTitle(post.getSpec().getTitle());
+        subject.setUrl(post.getStatus().getPermalink());
+        spec.setSubject(subject);
+        
+        // Set attributes
+        var attributes = Map.of(
+            "postName", post.getMetadata().getName(),
+            "postTitle", post.getSpec().getTitle(),
+            "commenter", comment.getSpec().getOwner(),
+            "comment", comment.getSpec().getContent()
+        );
+        spec.setAttributes(attributes);
+        reason.setSpec(spec);
+        
+        // Create reason and trigger notification
+        return client.create(reason)
+            .then(notificationCenter.notify(reason));
+    }
+}
+```
+
+### Subscription: User Event Subscriptions
+
+Manages which users are subscribed to which events:
+
+```yaml
+apiVersion: notification.halo.run/v1alpha1
+kind: Subscription
+metadata:
+  name: user-post-comment-subscription
+spec:
+  subscriber:
+    name: john-doe
+  unsubscribeToken: "xxxxxxxxxxxx"
+  reason:
+    reasonType: new-comment-on-post
+    subject:
+      apiVersion: content.halo.run/v1alpha1
+      kind: Post
+      name: 'post-axgu'
+```
+
+**Subscribing to Events:**
+
+**Location:** `run.halo.app.notification.NotificationCenter` at api/src/main/java/run/halo/app/notification/NotificationCenter.java:1
+
+```java
+import run.halo.app.notification.NotificationCenter;
+import run.halo.app.core.extension.notification.Subscription;
+
+@Service
+public class SubscriptionService {
+    
+    private final NotificationCenter notificationCenter;
+    
+    public Mono<Subscription> subscribeToPostComments(
+        String username, String postName) {
+        
+        var subscriber = new Subscription.Subscriber();
+        subscriber.setName(username);
+        
+        var reason = new Subscription.InterestReason();
+        reason.setReasonType("new-comment-on-post");
+        
+        var subject = new Subscription.ReasonSubject();
+        subject.setApiVersion("content.halo.run/v1alpha1");
+        subject.setKind("Post");
+        subject.setName(postName);
+        reason.setSubject(subject);
+        
+        return notificationCenter.subscribe(subscriber, reason);
+    }
+    
+    public Mono<Void> unsubscribe(String username) {
+        var subscriber = new Subscription.Subscriber();
+        subscriber.setName(username);
+        
+        return notificationCenter.unsubscribe(subscriber);
+    }
+}
+```
+
+**Unsubscribe API:**
+
+```
+GET /apis/api.notification.halo.run/v1alpha1/subscriptions/{name}/unsubscribe?token={unsubscribeToken}
+```
+
+### Notification: In-App Messages
+
+Stores user notifications (similar to inbox messages):
+
+```yaml
+apiVersion: notification.halo.run/v1alpha1
+kind: Notification
+metadata:
+  name: notification-abc
+spec:
+  recipient: "john-doe"
+  reason: 'comment-axgu'
+  title: 'New comment on your post'
+  rawContent: 'Jane Smith commented on your post "Hello World"'
+  htmlContent: '<p><strong>Jane Smith</strong> commented on your post <em>Hello World</em></p>'
+  unread: true
+  lastReadAt: null
+```
+
+**User Notification APIs:**
+
+```bash
+# List user notifications
+GET /apis/api.notification.halo.run/v1alpha1/userspaces/{username}/notifications
+
+# Mark as read
+PUT /apis/api.notification.halo.run/v1alpha1/userspaces/{username}/notifications/mark-as-read
+
+# Mark specific notifications as read
+PUT /apis/api.notification.halo.run/v1alpha1/userspaces/{username}/notifications/mark-specified-as-read
+```
+
+### User Notification Preferences
+
+Stored in user preference ConfigMap:
+
+```yaml
+apiVersion: v1alpha1
+kind: ConfigMap
+metadata:
+  name: user-preferences-john-doe
+data:
+  notification: |
+    {
+      reasonTypeNotification: {
+        'new-comment-on-post': {
+          enabled: true,
+          notifiers: [
+            'email-notifier',
+            'in-app-notifier'
+          ]
+        },
+        'new-post-published': {
+          enabled: true,
+          notifiers: [
+            'email-notifier',
+            'webhook-notifier'
+          ]
+        }
+      }
+    }
+```
+
+## Notification Templates
+
+Customize notification content using Thymeleaf templates:
+
+```yaml
+apiVersion: notification.halo.run/v1alpha1
+kind: NotificationTemplate
+metadata:
+  name: template-new-comment
+spec:
+  reasonSelector:
+    reasonType: new-comment-on-post
+    language: en_US
+  template:
+    title: "New comment on [(${postTitle})]"
+    rawBody: |
+      [(${commenter})] commented on your post [(${postTitle})]:
+      
+      [(${comment})]
+      
+      View post: [(${subject.url})]
+      Unsubscribe: [(${unsubscribeUrl})]
+    htmlBody: |
+      <p><strong>[(${commenter})]</strong> commented on your post <em>[(${postTitle})]</em>:</p>
+      <blockquote>[(${comment})]</blockquote>
+      <p><a href="[(${subject.url})]">View post</a></p>
+      <hr>
+      <p><small><a href="[(${unsubscribeUrl})]">Unsubscribe</a></small></p>
+```
+
+**Available Template Variables:**
+
+- All properties from `ReasonType`
+- `site.title`: Site title
+- `site.subtitle`: Site subtitle
+- `site.logo`: Site logo URL
+- `site.url`: Site URL
+- `subscriber.id`: User ID or `anonymousUser#email`
+- `subscriber.displayName`: User display name
+- `unsubscribeUrl`: Unsubscribe link
+- `subject.*`: Event subject properties
+
+**Template Selection Priority:**
+
+1. Language match (more specific to less specific, e.g., `zh_CN` > `zh`)
+2. Creation timestamp (newer templates preferred)
+
+<Info>
+Text templates use Thymeleaf textual mode. HTML templates use standard expression syntax in tag attributes.
+</Info>
+
+## Notification Delivery
+
+### NotifierDescriptor: Declare Notifiers
+
+```yaml
+apiVersion: notification.halo.run/v1alpha1
+kind: NotifierDescriptor
+metadata:
+  name: email-notifier
+spec:
+  displayName: 'Email Notifier'
+  description: 'Send notifications via email.'
+  notifierExtName: 'email-notifier-extension'
+  senderSettingRef:
+    name: 'email-notifier'
+    group: 'sender'
+  receiverSettingRef:
+    name: 'email-notifier'
+    group: 'receiver'
+```
+
+**Configuration APIs:**
+
+```bash
+# Admin: Get/Save sender config
+GET /apis/api.console.halo.run/v1alpha1/notifiers/{name}/sender-config
+POST /apis/api.console.halo.run/v1alpha1/notifiers/{name}/sender-config
+
+# User: Get/Save receiver config
+GET /apis/api.notification.halo.run/v1alpha1/notifiers/{name}/receiver-config
+POST /apis/api.notification.halo.run/v1alpha1/notifiers/{name}/receiver-config
+```
+
+### ReactiveNotifier: Implement Delivery
+
+**Location:** `run.halo.app.notification.ReactiveNotifier` at api/src/main/java/run/halo/app/notification/ReactiveNotifier.java:1
+
+```java
+import run.halo.app.notification.ReactiveNotifier;
+import run.halo.app.notification.NotificationContext;
+import org.pf4j.Extension;
+import reactor.core.publisher.Mono;
+
+@Extension
+public class EmailNotifier implements ReactiveNotifier {
+    
+    private final EmailService emailService;
+    
+    @Override
+    public Mono<Void> notify(NotificationContext context) {
+        var message = context.getMessage();
+        var receiverConfig = context.getReceiverConfig();
+        var senderConfig = context.getSenderConfig();
+        
+        // Extract recipient email from receiver config
+        String recipientEmail = receiverConfig.get("email").asText();
+        
+        // Extract SMTP settings from sender config
+        String smtpHost = senderConfig.get("host").asText();
+        int smtpPort = senderConfig.get("port").asInt();
+        
+        // Build email
+        var email = EmailMessage.builder()
+            .to(recipientEmail)
+            .subject(message.getPayload().getTitle())
+            .htmlBody(message.getPayload().getHtmlBody())
+            .textBody(message.getPayload().getRawBody())
+            .build();
+        
+        // Send email
+        return emailService.send(email, smtpHost, smtpPort)
+            .doOnError(e -> log.error("Failed to send email notification", e))
+            .then();
+    }
+}
+```
+
+**NotificationContext Structure:**
+
+```java
+public class NotificationContext {
+    private Message message;
+    private ObjectNode receiverConfig;
+    private ObjectNode senderConfig;
+    
+    public static class Message {
+        private MessagePayload payload;
+        private Subject subject;
+        private String recipient;
+        private Instant timestamp;
+    }
+    
+    public static class MessagePayload {
+        private String title;
+        private String rawBody;
+        private String htmlBody;
+        private ReasonAttributes attributes;
+    }
+    
+    public static class Subject {
+        private String apiVersion;
+        private String kind;
+        private String name;
+        private String title;
+        private String url;
+    }
+}
+```
+
+## Complete Example: Custom Plugin Notification
+
+### 1. Define ReasonType
+
+```java
+@Component
+public class OrderReasonTypeInitializer {
+    
+    private final ReactiveExtensionClient client;
+    
+    @EventListener(ApplicationReadyEvent.class)
+    public Mono<Void> initializeReasonType() {
+        var reasonType = new ReasonType();
+        var metadata = new Metadata();
+        metadata.setName("new-order-received");
+        reasonType.setMetadata(metadata);
+        
+        var spec = new ReasonType.Spec();
+        spec.setDisplayName("New Order Received");
+        spec.setDescription("A new order has been placed.");
+        
+        var properties = List.of(
+            new Property("orderId", "string", "Order ID", false),
+            new Property("productName", "string", "Product name", false),
+            new Property("amount", "string", "Order amount", false),
+            new Property("customerName", "string", "Customer name", false)
+        );
+        spec.setProperties(properties);
+        reasonType.setSpec(spec);
+        
+        return client.create(reasonType).then();
+    }
+}
+```
+
+### 2. Create Notification Template
+
+```java
+public Mono<Void> createTemplate() {
+    var template = new NotificationTemplate();
+    var metadata = new Metadata();
+    metadata.setName("template-new-order");
+    template.setMetadata(metadata);
+    
+    var spec = new NotificationTemplate.Spec();
+    var selector = new NotificationTemplate.ReasonSelector();
+    selector.setReasonType("new-order-received");
+    selector.setLanguage("en_US");
+    spec.setReasonSelector(selector);
+    
+    var templateSpec = new NotificationTemplate.Template();
+    templateSpec.setTitle("New Order: [(${orderId})]");
+    templateSpec.setRawBody(
+        "Customer [(${customerName})] ordered [(${productName})] " +
+        "for [(${amount})]."
+    );
+    spec.setTemplate(templateSpec);
+    template.setSpec(spec);
+    
+    return client.create(template).then();
+}
+```
+
+### 3. Trigger Notification
+
+```java
+@Service
+public class OrderService {
+    
+    private final NotificationCenter notificationCenter;
+    private final ReactiveExtensionClient client;
+    
+    public Mono<Void> placeOrder(Order order) {
+        return saveOrder(order)
+            .then(createNotificationReason(order))
+            .flatMap(notificationCenter::notify);
+    }
+    
+    private Mono<Reason> createNotificationReason(Order order) {
+        var reason = new Reason();
+        var metadata = new Metadata();
+        metadata.setName("order-" + order.getId());
+        reason.setMetadata(metadata);
+        
+        var spec = new Reason.Spec();
+        spec.setReasonType("new-order-received");
+        spec.setAuthor(order.getCustomerId());
+        
+        var subject = new Reason.Subject();
+        subject.setApiVersion("shop.halo.run/v1alpha1");
+        subject.setKind("Order");
+        subject.setName(order.getId());
+        subject.setTitle("Order #" + order.getId());
+        spec.setSubject(subject);
+        
+        spec.setAttributes(Map.of(
+            "orderId", order.getId(),
+            "productName", order.getProductName(),
+            "amount", order.getAmount().toString(),
+            "customerName", order.getCustomerName()
+        ));
+        reason.setSpec(spec);
+        
+        return client.create(reason);
+    }
+}
+```
+
+<Tip>
+Halo automatically creates in-app notifications for all events. You only need to implement custom notifiers for additional delivery methods like email, SMS, or webhooks.
+</Tip>
+
+## Best Practices
+
+1. **Event Granularity**: Define specific event types rather than generic ones
+2. **Template Versioning**: Create new templates rather than modifying existing ones
+3. **Unsubscribe Links**: Always include unsubscribe links in notifications
+4. **Error Handling**: Handle notifier failures gracefully without blocking
+5. **Rate Limiting**: Implement rate limiting for notification delivery
+6. **Batch Processing**: Group notifications when possible to reduce noise
+7. **Localization**: Provide templates for all supported languages
+
+## Related Resources
+
+- [Extension System](/developer/extension/overview)
+- [Event System](/developer/plugin/events)
+- [Plugin Development](/developer/plugin/basics)

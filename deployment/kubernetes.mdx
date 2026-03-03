@@ -1,0 +1,494 @@
+---
+title: "Kubernetes deployment"
+description: "Deploy Halo CMS on Kubernetes with persistent storage and database"
+---
+
+## Prerequisites
+
+Before deploying Halo on Kubernetes, ensure you have:
+
+- A running Kubernetes cluster (v1.20+)
+- `kubectl` configured to access your cluster
+- A storage class for persistent volumes
+- A PostgreSQL or MySQL database (managed or self-hosted)
+
+## Quick deployment
+
+Deploy Halo with PostgreSQL using the manifests below.
+
+### Create namespace
+
+```yaml namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: halo
+```
+
+### Database secret
+
+Create a secret for database credentials:
+
+```yaml secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: halo-db-secret
+  namespace: halo
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "your_secure_password"
+  POSTGRES_USER: "halo"
+  POSTGRES_DB: "halo"
+```
+
+<Warning>
+Replace `your_secure_password` with a strong password. Consider using sealed secrets or external secret managers for production.
+</Warning>
+
+### PostgreSQL deployment
+
+```yaml postgres.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: halo
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: halo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15.4
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: halo-db-secret
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: halo-db-secret
+              key: POSTGRES_USER
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: halo-db-secret
+              key: POSTGRES_DB
+        - name: PGUSER
+          valueFrom:
+            secretKeyRef:
+              name: halo-db-secret
+              key: POSTGRES_USER
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - halo
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - halo
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: halo
+spec:
+  selector:
+    app: postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+```
+
+### Halo deployment
+
+```yaml halo.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: halo-pvc
+  namespace: halo
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: halo-config
+  namespace: halo
+data:
+  HALO_WORK_DIR: "/root/.halo2"
+  TZ: "UTC"
+  JVM_OPTS: "-Xmx1g -Xms1g -XX:+UseG1GC"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: halo
+  namespace: halo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: halo
+  template:
+    metadata:
+      labels:
+        app: halo
+    spec:
+      containers:
+      - name: halo
+        image: halohub/halo:2.22
+        ports:
+        - containerPort: 8090
+          name: http
+        env:
+        - name: HALO_WORK_DIR
+          valueFrom:
+            configMapKeyRef:
+              name: halo-config
+              key: HALO_WORK_DIR
+        - name: TZ
+          valueFrom:
+            configMapKeyRef:
+              name: halo-config
+              key: TZ
+        - name: JVM_OPTS
+          valueFrom:
+            configMapKeyRef:
+              name: halo-config
+              key: JVM_OPTS
+        args:
+        - --spring.r2dbc.url=r2dbc:pool:postgresql://postgres:5432/halo
+        - --spring.r2dbc.username=halo
+        - --spring.r2dbc.password=your_secure_password
+        - --spring.sql.init.platform=postgresql
+        - --halo.external-url=https://yourdomain.com
+        volumeMounts:
+        - name: halo-storage
+          mountPath: /root/.halo2
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8090
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8090
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 5
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+      volumes:
+      - name: halo-storage
+        persistentVolumeClaim:
+          claimName: halo-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: halo
+  namespace: halo
+spec:
+  selector:
+    app: halo
+  ports:
+  - port: 8090
+    targetPort: 8090
+    name: http
+  type: ClusterIP
+```
+
+<Info>
+Replace `your_secure_password` and `https://yourdomain.com` with your actual values in the deployment manifest.
+</Info>
+
+## Deploy to cluster
+
+<Steps>
+  <Step title="Apply manifests">
+    Deploy all resources to your cluster:
+    ```bash
+    kubectl apply -f namespace.yaml
+    kubectl apply -f secret.yaml
+    kubectl apply -f postgres.yaml
+    kubectl apply -f halo.yaml
+    ```
+  </Step>
+  
+  <Step title="Check pod status">
+    Wait for all pods to be running:
+    ```bash
+    kubectl get pods -n halo -w
+    ```
+  </Step>
+  
+  <Step title="View logs">
+    Check Halo logs for successful startup:
+    ```bash
+    kubectl logs -n halo -l app=halo -f
+    ```
+  </Step>
+  
+  <Step title="Access the application">
+    Port-forward to access Halo locally:
+    ```bash
+    kubectl port-forward -n halo svc/halo 8090:8090
+    ```
+    
+    Then open `http://localhost:8090` in your browser.
+  </Step>
+</Steps>
+
+## Ingress configuration
+
+Expose Halo through an Ingress controller for external access.
+
+<CodeGroup>
+
+```yaml nginx-ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: halo-ingress
+  namespace: halo
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - yourdomain.com
+    secretName: halo-tls
+  rules:
+  - host: yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: halo
+            port:
+              number: 8090
+```
+
+```yaml traefik-ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: halo-ingress
+  namespace: halo
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    traefik.ingress.kubernetes.io/router.middlewares: halo-compress@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+  - hosts:
+    - yourdomain.com
+    secretName: halo-tls
+  rules:
+  - host: yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: halo
+            port:
+              number: 8090
+```
+
+</CodeGroup>
+
+Apply the ingress configuration:
+
+```bash
+kubectl apply -f nginx-ingress.yaml
+```
+
+## Scaling considerations
+
+<Warning>
+Halo currently does not support horizontal pod autoscaling due to shared file storage requirements. Keep replicas set to 1.
+</Warning>
+
+For high availability:
+
+1. **Use managed databases**: Deploy PostgreSQL on a managed service (AWS RDS, Google Cloud SQL, Azure Database)
+2. **Object storage**: Configure S3-compatible storage for uploads instead of local filesystem
+3. **External cache**: Use Redis for session and cache storage
+4. **Database backups**: Enable automated backups on your database service
+
+## Resource requirements
+
+Recommended resource allocations based on site size:
+
+<AccordionGroup>
+  <Accordion title="Small sites (< 1000 posts)">
+    ```yaml
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+    ```
+  </Accordion>
+  
+  <Accordion title="Medium sites (1000-5000 posts)">
+    ```yaml
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "2000m"
+    ```
+  </Accordion>
+  
+  <Accordion title="Large sites (> 5000 posts)">
+    ```yaml
+    resources:
+      requests:
+        memory: "2Gi"
+        cpu: "1000m"
+      limits:
+        memory: "4Gi"
+        cpu: "4000m"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Monitoring and logging
+
+Integrate Halo with your monitoring stack:
+
+```yaml monitoring.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: halo-metrics
+  namespace: halo
+  labels:
+    app: halo
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/actuator/prometheus"
+    prometheus.io/port: "8090"
+spec:
+  selector:
+    app: halo
+  ports:
+  - port: 8090
+    name: metrics
+```
+
+Halo exposes metrics at `/actuator/prometheus` that can be scraped by Prometheus.
+
+## Upgrading
+
+<Steps>
+  <Step title="Backup your data">
+    Create a backup of persistent volumes before upgrading:
+    ```bash
+    kubectl exec -n halo -it <halo-pod-name> -- tar -czf /tmp/backup.tar.gz /root/.halo2
+    kubectl cp halo/<halo-pod-name>:/tmp/backup.tar.gz ./halo-backup-$(date +%Y%m%d).tar.gz
+    ```
+  </Step>
+  
+  <Step title="Update image version">
+    Edit your deployment manifest and change the image tag:
+    ```yaml
+    image: halohub/halo:2.23  # Update to new version
+    ```
+  </Step>
+  
+  <Step title="Apply changes">
+    ```bash
+    kubectl apply -f halo.yaml
+    ```
+    
+    Kubernetes will perform a rolling update automatically.
+  </Step>
+  
+  <Step title="Verify upgrade">
+    Check pod status and logs:
+    ```bash
+    kubectl get pods -n halo
+    kubectl logs -n halo -l app=halo -f
+    ```
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Backup and restore" icon="floppy-disk" href="/deployment/backup-restore">
+    Set up automated backups for your Kubernetes deployment
+  </Card>
+  
+  <Card title="Docker deployment" icon="docker" href="/deployment/docker">
+    Learn about Docker-based deployment options
+  </Card>
+</CardGroup>

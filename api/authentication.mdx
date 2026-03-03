@@ -1,0 +1,380 @@
+---
+title: 'API Authentication'
+description: 'Learn how to authenticate your API requests using Basic Auth and Personal Access Tokens (PAT)'
+---
+
+## Overview
+
+Halo API supports two authentication methods:
+
+1. **Basic Authentication** - Username and password
+2. **Bearer Token Authentication** - Personal Access Tokens (PAT) or JWT tokens
+
+<Note>
+Most API endpoints require authentication. Public content endpoints may allow unauthenticated access for read operations, but authentication is required for user-specific data or write operations.
+</Note>
+
+## Basic Authentication
+
+Basic Authentication uses your Halo username and password. This method is suitable for:
+
+- Development and testing
+- Server-to-server integrations in trusted environments
+- Quick API exploration
+
+<Warning>
+Basic Authentication sends credentials with every request. Always use HTTPS in production to protect your credentials. For production applications, **Personal Access Tokens** are strongly recommended.
+</Warning>
+
+### How It Works
+
+Basic Authentication requires sending your credentials in the `Authorization` header using Base64 encoding:
+
+```
+Authorization: Basic base64(username:password)
+```
+
+### Example Request
+
+<CodeGroup>
+
+```bash curl
+curl -X GET 'http://localhost:8091/api/v1alpha1/posts' \
+  -H 'Authorization: Basic YWRtaW46cGFzc3dvcmQ=' \
+  -H 'Content-Type: application/json'
+```
+
+```javascript JavaScript
+const username = 'admin';
+const password = 'your-password';
+const credentials = Buffer.from(`${username}:${password}`).toString('base64');
+
+fetch('http://localhost:8091/api/v1alpha1/posts', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Basic ${credentials}`,
+    'Content-Type': 'application/json'
+  }
+})
+.then(response => response.json())
+.then(data => console.log(data));
+```
+
+```python Python
+import requests
+import base64
+
+username = 'admin'
+password = 'your-password'
+credentials = base64.b64encode(f'{username}:{password}'.encode()).decode()
+
+headers = {
+    'Authorization': f'Basic {credentials}',
+    'Content-Type': 'application/json'
+}
+
+response = requests.get(
+    'http://localhost:8091/api/v1alpha1/posts',
+    headers=headers
+)
+
+print(response.json())
+```
+
+```go Go
+package main
+
+import (
+    "encoding/base64"
+    "fmt"
+    "io/ioutil"
+    "net/http"
+)
+
+func main() {
+    username := "admin"
+    password := "your-password"
+    credentials := base64.StdEncoding.EncodeToString(
+        []byte(username + ":" + password),
+    )
+
+    client := &http.Client{}
+    req, _ := http.NewRequest(
+        "GET",
+        "http://localhost:8091/api/v1alpha1/posts",
+        nil,
+    )
+    req.Header.Add("Authorization", "Basic "+credentials)
+    req.Header.Add("Content-Type", "application/json")
+
+    resp, err := client.Do(req)
+    if err != nil {
+        panic(err)
+    }
+    defer resp.Body.Close()
+
+    body, _ := ioutil.ReadAll(resp.Body)
+    fmt.Println(string(body))
+}
+```
+
+</CodeGroup>
+
+### Basic Auth Parameters
+
+<ParamField header="Authorization" type="string" required>
+  The Basic authentication header in the format: `Basic base64(username:password)`
+  
+  To create the value:
+  1. Combine username and password with a colon: `username:password`
+  2. Encode the string in Base64
+  3. Prefix with `Basic `
+</ParamField>
+
+## Personal Access Tokens (PAT)
+
+Personal Access Tokens are the recommended authentication method for production applications. PATs provide:
+
+- **Enhanced security** - No need to share your password
+- **Granular permissions** - Can be scoped to specific operations
+- **Easy revocation** - Revoke tokens without changing your password
+- **Audit trails** - Track API usage per token
+
+### Creating a Personal Access Token
+
+1. Log in to your Halo admin dashboard
+2. Navigate to **User Center** > **Personal Access Tokens**
+3. Click **Generate New Token**
+4. Provide a descriptive name for the token
+5. Set token expiration (optional but recommended)
+6. Select permissions/scopes for the token
+7. Click **Generate**
+8. **Copy and save the token immediately** - you won't be able to see it again
+
+<Warning>
+Store your Personal Access Tokens securely. Treat them like passwords - never commit them to version control or share them publicly.
+</Warning>
+
+### Using Personal Access Tokens
+
+Include the token in the `Authorization` header as a Bearer token:
+
+```
+Authorization: Bearer your-personal-access-token
+```
+
+### Example Request with PAT
+
+<CodeGroup>
+
+```bash curl
+curl -X GET 'http://localhost:8091/api/v1alpha1/posts' \
+  -H 'Authorization: Bearer pat_1234567890abcdef' \
+  -H 'Content-Type: application/json'
+```
+
+```javascript JavaScript
+const token = 'pat_1234567890abcdef';
+
+fetch('http://localhost:8091/api/v1alpha1/posts', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  }
+})
+.then(response => response.json())
+.then(data => console.log(data));
+```
+
+```python Python
+import requests
+
+token = 'pat_1234567890abcdef'
+
+headers = {
+    'Authorization': f'Bearer {token}',
+    'Content-Type': 'application/json'
+}
+
+response = requests.get(
+    'http://localhost:8091/api/v1alpha1/posts',
+    headers=headers
+)
+
+print(response.json())
+```
+
+```go Go
+package main
+
+import (
+    "fmt"
+    "io/ioutil"
+    "net/http"
+)
+
+func main() {
+    token := "pat_1234567890abcdef"
+
+    client := &http.Client{}
+    req, _ := http.NewRequest(
+        "GET",
+        "http://localhost:8091/api/v1alpha1/posts",
+        nil,
+    )
+    req.Header.Add("Authorization", "Bearer "+token)
+    req.Header.Add("Content-Type", "application/json")
+
+    resp, err := client.Do(req)
+    if err != nil {
+        panic(err)
+    }
+    defer resp.Body.Close()
+
+    body, _ := ioutil.ReadAll(resp.Body)
+    fmt.Println(string(body))
+}
+```
+
+</CodeGroup>
+
+### Bearer Token Parameters
+
+<ParamField header="Authorization" type="string" required>
+  The Bearer token header in the format: `Bearer your-token`
+  
+  The token can be:
+  - A Personal Access Token (recommended)
+  - A JWT token from the authentication endpoint
+</ParamField>
+
+## Token Management Best Practices
+
+### Security Recommendations
+
+<Steps>
+  <Step title="Use Environment Variables">
+    Store tokens in environment variables, never hardcode them:
+    
+    ```bash
+    export HALO_API_TOKEN="pat_1234567890abcdef"
+    ```
+  </Step>
+  
+  <Step title="Set Expiration Dates">
+    Always set expiration dates for tokens. For production, use short-lived tokens (30-90 days) and rotate them regularly.
+  </Step>
+  
+  <Step title="Use Minimal Permissions">
+    Grant tokens only the permissions they need. Don't use admin tokens for read-only operations.
+  </Step>
+  
+  <Step title="Monitor Token Usage">
+    Regularly review token usage in your Halo admin dashboard and revoke unused tokens.
+  </Step>
+  
+  <Step title="Rotate Tokens Regularly">
+    Implement a token rotation policy, especially for production environments.
+  </Step>
+</Steps>
+
+### Revoking Tokens
+
+If a token is compromised or no longer needed:
+
+1. Log in to Halo admin dashboard
+2. Navigate to **User Center** > **Personal Access Tokens**
+3. Find the token in the list
+4. Click **Revoke**
+5. Confirm the revocation
+
+<Info>
+Revoked tokens become invalid immediately. Any API requests using a revoked token will receive a 401 Unauthorized response.
+</Info>
+
+## Authentication Errors
+
+### Common Error Responses
+
+#### 401 Unauthorized - Missing Authentication
+
+```json
+{
+  "status": 401,
+  "error": "Unauthorized",
+  "message": "Authentication required",
+  "path": "/api/v1alpha1/posts"
+}
+```
+
+**Solution:** Include the `Authorization` header in your request.
+
+#### 401 Unauthorized - Invalid Credentials
+
+```json
+{
+  "status": 401,
+  "error": "Unauthorized",
+  "message": "Invalid username or password",
+  "path": "/api/v1alpha1/posts"
+}
+```
+
+**Solution:** Verify your username and password are correct.
+
+#### 401 Unauthorized - Invalid Token
+
+```json
+{
+  "status": 401,
+  "error": "Unauthorized",
+  "message": "Invalid or expired token",
+  "path": "/api/v1alpha1/posts"
+}
+```
+
+**Solution:** The token may be invalid, expired, or revoked. Generate a new token.
+
+#### 403 Forbidden - Insufficient Permissions
+
+```json
+{
+  "status": 403,
+  "error": "Forbidden",
+  "message": "Insufficient permissions to access this resource",
+  "path": "/api/v1alpha1/users"
+}
+```
+
+**Solution:** Your account or token doesn't have the required permissions. Request higher privileges or use an admin account.
+
+## Testing Authentication
+
+You can test your authentication credentials with a simple API call:
+
+```bash
+curl -X GET 'http://localhost:8091/api/v1alpha1/posts' \
+  -H 'Authorization: Bearer your-token' \
+  -H 'Content-Type: application/json' \
+  -w '\nHTTP Status: %{http_code}\n'
+```
+
+A successful response (HTTP 200) indicates your authentication is working correctly.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Overview" icon="book" href="/api/overview">
+    Learn about API architecture and versioning
+  </Card>
+  <Card title="Public APIs" icon="globe" href="/api/public/posts">
+    Explore public content APIs
+  </Card>
+  <Card title="Console APIs" icon="terminal" href="/api/console/content-management">
+    Manage your Halo instance
+  </Card>
+  <Card title="Extension APIs" icon="puzzle-piece" href="/api/extension/core-extensions">
+    Access custom extensions
+  </Card>
+</CardGroup>
