@@ -1,0 +1,174 @@
+{
+  "projectType": "saas",
+  "projectName": "Halo",
+  "projectDescription": "A powerful and easy-to-use open-source CMS for building websites and blogs.",
+  "theme": "maple",
+  "primaryColor": "#0e7490",
+  "lightColor": "#06b6d4",
+  "darkColor": "#164e63",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/extensions",
+              "concepts/plugins",
+              "concepts/themes"
+            ]
+          },
+          {
+            "group": "User Guide",
+            "pages": [
+              "user-guide/posts",
+              "user-guide/pages",
+              "user-guide/categories-tags",
+              "user-guide/comments",
+              "user-guide/menus",
+              "user-guide/themes-management",
+              "user-guide/plugins-management",
+              "user-guide/users-roles",
+              "user-guide/attachments"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/docker",
+              "deployment/kubernetes",
+              "deployment/reverse-proxy",
+              "deployment/backup-restore"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Developer Guide",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "developer/overview",
+              "developer/environment-setup"
+            ]
+          },
+          {
+            "group": "Plugin Development",
+            "pages": [
+              "developer/plugin/basics",
+              "developer/plugin/structure",
+              "developer/plugin/lifecycle",
+              "developer/plugin/api-extension",
+              "developer/plugin/custom-endpoints",
+              "developer/plugin/configuration",
+              "developer/plugin/events"
+            ]
+          },
+          {
+            "group": "Theme Development",
+            "pages": [
+              "developer/theme/basics",
+              "developer/theme/structure",
+              "developer/theme/templates",
+              "developer/theme/assets",
+              "developer/theme/configuration"
+            ]
+          },
+          {
+            "group": "Extension System",
+            "pages": [
+              "developer/extension/overview",
+              "developer/extension/custom-models",
+              "developer/extension/indexing",
+              "developer/extension/reconciler"
+            ]
+          },
+          {
+            "group": "Advanced Topics",
+            "pages": [
+              "developer/advanced/authentication",
+              "developer/advanced/search",
+              "developer/advanced/notifications",
+              "developer/advanced/caching"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/overview",
+              "api/authentication"
+            ]
+          },
+          {
+            "group": "Public APIs",
+            "pages": [
+              "api/public/posts",
+              "api/public/pages",
+              "api/public/categories",
+              "api/public/tags",
+              "api/public/comments"
+            ]
+          },
+          {
+            "group": "Console APIs",
+            "pages": [
+              "api/console/content-management",
+              "api/console/user-management",
+              "api/console/plugin-management",
+              "api/console/theme-management"
+            ]
+          },
+          {
+            "group": "Extension APIs",
+            "pages": [
+              "api/extension/core-extensions",
+              "api/extension/custom-extensions"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Content Management - Posts, pages, categories, tags, and comments",
+    "Plugin System - Extensible plugin architecture with lifecycle management",
+    "Theme System - Customizable themes with template engine support",
+    "Extension Framework - Kubernetes-style custom resource definitions",
+    "User & Role Management - Authentication, authorization, and RBAC",
+    "Media Library - Attachment management with various storage backends",
+    "Search & Indexing - Full-text search with efficient indexing",
+    "Notification System - Event-driven notification framework"
+  ],
+  "publicApiSurface": [
+    "GET /apis/api.console.halo.run/v1alpha1/posts - List posts",
+    "POST /apis/api.console.halo.run/v1alpha1/posts - Create post",
+    "GET /apis/api.halo.run/v1alpha1/categories - List categories",
+    "GET /apis/api.halo.run/v1alpha1/tags - List tags",
+    "POST /apis/api.console.halo.run/v1alpha1/plugins - Install plugin",
+    "GET /apis/plugin.halo.run/v1alpha1/plugins - List installed plugins",
+    "POST /apis/api.console.halo.run/v1alpha1/themes - Install theme",
+    "GET /apis/theme.halo.run/v1alpha1/themes - List installed themes",
+    "GET /apis/content.halo.run/v1alpha1/posts/{name} - Get post by name",
+    "POST /apis/api.halo.run/v1alpha1/comments - Create comment",
+    "GET /apis/storage.halo.run/v1alpha1/attachments - List attachments",
+    "Extension.create() - Create custom extension",
+    "Extension.update() - Update custom extension",
+    "ReactiveExtensionClient.list() - List extensions with filtering"
+  ]
+}
